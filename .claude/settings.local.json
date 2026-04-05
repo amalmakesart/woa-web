@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/alhomsiah/**)",
+      "Bash(npx create-expo-app:*)"
+    ]
+  }
+}
