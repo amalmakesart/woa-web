@@ -25,23 +25,24 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  // With basePath '/app', middleware sees full paths like /app/feed
   const { pathname } = request.nextUrl
-  const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/signup')
-  const isAppRoute = pathname.startsWith('/feed') ||
-    pathname.startsWith('/artists') ||
-    pathname.startsWith('/gigs') ||
-    pathname.startsWith('/features') ||
-    pathname.startsWith('/messages') ||
-    pathname.startsWith('/notifications') ||
-    pathname.startsWith('/profile') ||
-    pathname.startsWith('/search')
+  const isAuthRoute = pathname.startsWith('/app/login') || pathname.startsWith('/app/signup')
+  const isAppRoute = pathname.startsWith('/app/feed') ||
+    pathname.startsWith('/app/artists') ||
+    pathname.startsWith('/app/gigs') ||
+    pathname.startsWith('/app/features') ||
+    pathname.startsWith('/app/messages') ||
+    pathname.startsWith('/app/notifications') ||
+    pathname.startsWith('/app/profile') ||
+    pathname.startsWith('/app/search')
 
   if (!user && isAppRoute) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return NextResponse.redirect(new URL('/app/login', request.url))
   }
 
   if (user && isAuthRoute) {
-    return NextResponse.redirect(new URL('/feed', request.url))
+    return NextResponse.redirect(new URL('/app/feed', request.url))
   }
 
   return supabaseResponse
