@@ -26,6 +26,7 @@ interface Post {
   media_url: string | null
   title: string | null
   like_count: number
+  created_at: string
 }
 
 const MENU = [
@@ -50,15 +51,30 @@ export default function ProfilePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const [{ data: prof }, { data: postsData, count }, { count: followCount }] = await Promise.all([
+    const [{ data: prof }, { data: ownedPosts, count }, { count: followCount }, { data: collaboratorRows }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
-      supabase.from('posts').select('id, type, media_url, title, like_count', { count: 'exact' })
+      supabase.from('posts').select('id, type, media_url, title, like_count, created_at', { count: 'exact' })
         .eq('user_id', user.id).order('created_at', { ascending: false }).limit(12),
       supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', user.id),
+      supabase.from('post_collaborators').select('post_id').eq('collaborator_id', user.id).eq('accepted', true),
     ])
 
+    const collaboratorPostIds = [...new Set((collaboratorRows ?? []).map((row: any) => row.post_id))]
+    const { data: collaboratorPosts } = collaboratorPostIds.length > 0
+      ? await supabase
+          .from('posts')
+          .select('id, type, media_url, title, like_count, created_at')
+          .in('id', collaboratorPostIds)
+          .order('created_at', { ascending: false })
+          .limit(12)
+      : { data: [] as any[] }
+
+    const recentPosts = [...((ownedPosts as Post[]) ?? []), ...((collaboratorPosts as Post[]) ?? [])]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 12)
+
     setProfile(prof as Profile)
-    setPosts((postsData as Post[]) ?? [])
+    setPosts(recentPosts)
     setPostCount(count ?? 0)
     setFollowingCount(followCount ?? 0)
     setLoading(false)

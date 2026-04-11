@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 
 interface Post {
   id: string
+  user_id: string
   type: string
   media_url: string | null
   title: string | null
@@ -14,6 +15,7 @@ interface Post {
   like_count: number
   comment_count: number
   created_at: string
+  is_copost?: boolean
 }
 
 function timeAgo(dateStr: string) {
@@ -42,13 +44,36 @@ export default function MyPostsPage() {
       if (!user) { router.push('/login'); return }
       setCurrentUserId(user.id)
 
-      const { data } = await supabase
-        .from('posts')
-        .select('id, type, media_url, title, content, like_count, comment_count, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+      const [{ data: ownedPosts }, { data: collaboratorRows }] = await Promise.all([
+        supabase
+          .from('posts')
+          .select('id, user_id, type, media_url, title, content, like_count, comment_count, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('post_collaborators')
+          .select('post_id')
+          .eq('collaborator_id', user.id)
+          .eq('accepted', true),
+      ])
 
-      setPosts((data as Post[]) ?? [])
+      const collaboratorPostIds = [...new Set((collaboratorRows ?? []).map((row: any) => row.post_id))]
+      const { data: collaboratorPosts } = collaboratorPostIds.length > 0
+        ? await supabase
+            .from('posts')
+            .select('id, user_id, type, media_url, title, content, like_count, comment_count, created_at')
+            .in('id', collaboratorPostIds)
+            .order('created_at', { ascending: false })
+        : { data: [] as any[] }
+
+      const merged = [
+        ...((ownedPosts as Post[]) ?? []),
+        ...(((collaboratorPosts as Post[]) ?? []).map(post => ({ ...post, is_copost: true }))),
+      ]
+      const uniquePosts = Array.from(new Map(merged.map(post => [post.id, post])).values())
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+      setPosts(uniquePosts)
       setLoading(false)
     }
     load()
@@ -59,6 +84,10 @@ export default function MyPostsPage() {
     setPosts(prev => prev.filter(p => p.id !== postId))
     setConfirmDelete(null)
     await supabase.from('posts').delete().eq('id', postId)
+  }
+
+  function handleEdit(postId: string) {
+    router.push(`/feed/new?edit=${postId}`)
   }
 
   if (loading) {
@@ -124,6 +153,7 @@ export default function MyPostsPage() {
               </Link>
 
               {/* Delete button */}
+              {!post.is_copost && currentUserId === post.user_id && (
               <button
                 onClick={() => setConfirmDelete(post.id)}
                 style={{
@@ -134,6 +164,7 @@ export default function MyPostsPage() {
                   borderRadius: 2, fontFamily: 'inherit',
                 }}
               >✕</button>
+              )}
             </div>
           ))}
         </div>
@@ -157,16 +188,29 @@ export default function MyPostsPage() {
                     {post.title ?? (post.content?.slice(0, 40) ?? '').toUpperCase() ?? 'UNTITLED'}
                   </p>
                 </Link>
+                {post.is_copost && (
+                  <p style={{ fontSize: 10, color: '#c0392b', letterSpacing: '0.08em', marginBottom: 4 }}>CO-POST</p>
+                )}
                 <div style={{ display: 'flex', gap: 12 }}>
                   <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.06em' }}>♥ {post.like_count}</span>
                   <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.06em' }}>◻ {post.comment_count}</span>
                   <span style={{ fontSize: 10, color: '#555', letterSpacing: '0.06em' }}>{timeAgo(post.created_at)}</span>
                 </div>
               </div>
-              <button
-                onClick={() => setConfirmDelete(post.id)}
-                style={{ background: 'none', border: '1px solid #c0392b', color: '#c0392b', padding: '6px 10px', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.06em', flexShrink: 0 }}
-              >DELETE</button>
+              {!post.is_copost && currentUserId === post.user_id ? (
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button
+                    onClick={() => handleEdit(post.id)}
+                    style={{ background: 'none', border: '1px solid #888880', color: '#fff', padding: '6px 10px', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.06em' }}
+                  >EDIT</button>
+                  <button
+                    onClick={() => setConfirmDelete(post.id)}
+                    style={{ background: 'none', border: '1px solid #c0392b', color: '#c0392b', padding: '6px 10px', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.06em' }}
+                  >DELETE</button>
+                </div>
+              ) : (
+                <span style={{ fontSize: 10, color: '#555', letterSpacing: '0.06em', flexShrink: 0 }}>ACCEPTED</span>
+              )}
             </div>
           ))}
         </div>

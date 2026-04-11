@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-type NotifType = 'new_message' | 'new_follower' | 'post_liked' | 'post_comment' | 'gig_interest' | 'gig_nearby'
+type NotifType = 'new_message' | 'new_follower' | 'post_liked' | 'post_comment' | 'gig_interest' | 'gig_nearby' | 'co_post_invite'
 
 interface Notif {
   id: string
@@ -38,6 +38,7 @@ function notifIcon(type: string) {
   if (type === 'new_follower') return '+'
   if (type === 'post_comment') return '◻'
   if (type === 'gig_interest' || type === 'gig_nearby') return '◎'
+  if (type === 'co_post_invite') return '◈'
   if (type === 'new_message') return '▷'
   return '●'
 }
@@ -65,6 +66,8 @@ function notifText(n: Notif): { main: string; sub: string | null } {
       return { main: `${handle} EXPRESSED INTEREST IN YOUR GIG`, sub: n.gigTitle ?? n.preview_text ?? null }
     case 'gig_nearby':
       return { main: 'NEW GIG POSTED NEAR YOU', sub: n.gigTitle ?? n.preview_text ?? null }
+    case 'co_post_invite':
+      return { main: `${handle} INVITED YOU TO CO-POST`, sub: n.preview_text ?? 'TAP TO ACCEPT THIS CO-POST INVITE.' }
     default:
       return { main: 'NEW NOTIFICATION', sub: null }
   }
@@ -82,19 +85,24 @@ function notifHref(n: Notif): string {
       return n.actor_id ? `/artists/${n.actor_id}` : '#'
     case 'new_message':
       return n.reference_id && n.reference_type !== 'welcome' ? `/messages/${n.reference_id}` : '/messages'
+    case 'co_post_invite':
+      return n.reference_id ? `/feed/${n.reference_id}` : '#'
     default:
       return '#'
   }
 }
 
 export default function NotificationsPage() {
+  const router = useRouter()
   const [notifs, setNotifs] = useState<Notif[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUserId(user?.id ?? null)
       if (!user) { setLoading(false); return }
 
       const { data: raw } = await supabase
@@ -149,6 +157,18 @@ export default function NotificationsPage() {
     load()
   }, [])
 
+  async function handleNotifClick(notif: Notif, href: string) {
+    const supabase = createClient()
+    if (notif.type === 'co_post_invite' && notif.reference_id && currentUserId) {
+      await supabase
+        .from('post_collaborators')
+        .update({ accepted: true })
+        .eq('post_id', notif.reference_id)
+        .eq('collaborator_id', currentUserId)
+    }
+    router.push(href)
+  }
+
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', padding: '20px' }}>
       <h1 style={{
@@ -173,7 +193,11 @@ export default function NotificationsPage() {
           const { main, sub } = notifText(notif)
 
           return (
-            <Link key={notif.id} href={href} style={{ textDecoration: 'none', display: 'block' }}>
+            <button
+              key={notif.id}
+              onClick={() => handleNotifClick(notif, href)}
+              style={{ textDecoration: 'none', display: 'block', width: '100%', background: 'none', border: 'none', padding: 0, textAlign: 'inherit', fontFamily: 'inherit' }}
+            >
               <div
                 style={{
                   display: 'flex',
@@ -222,7 +246,7 @@ export default function NotificationsPage() {
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#c0392b', flexShrink: 0 }} />
                 )}
               </div>
-            </Link>
+            </button>
           )
         })
       )}

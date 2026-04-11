@@ -39,6 +39,7 @@ interface Post {
   media_url: string | null
   title: string | null
   like_count: number
+  created_at: string
 }
 
 interface PortfolioSection {
@@ -113,26 +114,42 @@ export default function ArtistProfilePage() {
 
       const [
         { data: prof },
-        { data: postsData, count },
+        { data: ownedPosts, count },
         { data: followData },
         { count: followingCountRaw },
         { data: portfolioData },
         { data: showsData },
         { data: reviewsData },
+        { data: collaboratorRows },
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', id).single(),
-        supabase.from('posts').select('id, type, media_url, title, like_count', { count: 'exact' })
+        supabase.from('posts').select('id, type, media_url, title, like_count, created_at', { count: 'exact' })
           .eq('user_id', id).order('created_at', { ascending: false }).limit(30),
         user ? supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', id).maybeSingle() : Promise.resolve({ data: null }),
         supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', id),
         supabase.from('portfolio_sections').select('id, title, cover_image_url, display_order').eq('artist_id', id).order('display_order'),
         supabase.from('shows').select('*').eq('artist_id', id).gte('show_date', new Date().toISOString()).order('show_date').limit(20),
         supabase.from('reviews').select('id, rating, body, created_at, profiles:reviewer_id(username, profile_photo_url)').eq('reviewee_id', id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('post_collaborators').select('post_id').eq('collaborator_id', id).eq('accepted', true),
       ])
 
+      const collaboratorPostIds = [...new Set((collaboratorRows ?? []).map((row: any) => row.post_id))]
+      const { data: collaboratorPosts } = collaboratorPostIds.length > 0
+        ? await supabase
+            .from('posts')
+            .select('id, type, media_url, title, like_count, created_at')
+            .in('id', collaboratorPostIds)
+            .order('created_at', { ascending: false })
+            .limit(30)
+        : { data: [] as any[] }
+
+      const mergedPosts = [...((ownedPosts as Post[]) ?? []), ...((collaboratorPosts as Post[]) ?? [])]
+      const uniquePosts = Array.from(new Map(mergedPosts.map(post => [post.id, post])).values())
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
       setProfile(prof as Profile)
-      setPosts((postsData as Post[]) ?? [])
-      setPostCount(count ?? 0)
+      setPosts(uniquePosts)
+      setPostCount(uniquePosts.length || count || 0)
       setIsFollowing(!!followData)
       setFollowingCount(followingCountRaw ?? 0)
       setShows((showsData as Show[]) ?? [])

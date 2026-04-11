@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { PostActionsMenu } from '@/components/PostActionsMenu'
 
 interface Post {
   id: string
@@ -17,6 +18,7 @@ interface Post {
   comment_count: number
   created_at: string
   profiles?: { username: string | null; full_name: string | null; profile_photo_url: string | null; art_type: string | null } | null
+  collaborators?: { id: string; username: string | null; full_name: string | null }[]
 }
 
 interface Comment {
@@ -77,8 +79,21 @@ export default function PostDetailPage() {
         .select('username, full_name, profile_photo_url, art_type')
         .eq('id', (postData as any).user_id)
         .single()
+      const { data: collaboratorRows } = await supabase
+        .from('post_collaborators')
+        .select('collaborator_id, accepted')
+        .eq('post_id', postId)
+        .eq('accepted', true)
+      const collaboratorIds = [...new Set((collaboratorRows ?? []).map((row: any) => row.collaborator_id))]
+      const { data: collaboratorProfiles } = collaboratorIds.length > 0
+        ? await supabase.from('profiles').select('id, username, full_name').in('id', collaboratorIds)
+        : { data: [] as any[] }
 
-      setPost({ ...(postData as Post), profiles: authorProfile as any })
+      setPost({
+        ...(postData as Post),
+        profiles: authorProfile as any,
+        collaborators: (collaboratorProfiles as any[]) ?? [],
+      })
 
       // Fetch profiles for comments
       const rawComments = (commentsData as Comment[]) ?? []
@@ -134,6 +149,24 @@ export default function PostDetailPage() {
     }
   }
 
+  async function handleDelete() {
+    if (!currentUserId || !post || currentUserId !== post.user_id) return
+    if (!window.confirm('DELETE THIS POST? THIS CANNOT BE UNDONE.')) return
+    const supabase = createClient()
+    await supabase.from('posts').delete().eq('id', post.id)
+    router.push('/feed')
+  }
+
+  function handleEdit() {
+    if (!currentUserId || !post || currentUserId !== post.user_id) return
+    router.push(`/feed/new?edit=${post.id}`)
+  }
+
+  function handleReport() {
+    if (!post || currentUserId === post.user_id) return
+    window.alert(`REPORTED @${post.profiles?.username?.toUpperCase() ?? 'USER'} — THANK YOU.`)
+  }
+
   async function handleComment(e: React.FormEvent) {
     e.preventDefault()
     if (!commentText.trim() || !currentUserId || !post) return
@@ -169,6 +202,10 @@ export default function PostDetailPage() {
   }
 
   const profile = post.profiles
+  const collaboratorNames = (post.collaborators ?? [])
+    .map(c => c.username ?? c.full_name)
+    .filter(Boolean)
+    .map(name => `@${String(name).toUpperCase()}`)
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '20px' }}>
@@ -191,11 +228,24 @@ export default function PostDetailPage() {
               {(profile?.username ?? profile?.full_name ?? 'UNKNOWN').toUpperCase()}
             </span>
           </Link>
+          {collaboratorNames.length > 0 && (
+            <span style={{ display: 'block', fontSize: 10, color: '#c0392b', letterSpacing: '0.06em', marginTop: 2 }}>
+              {collaboratorNames.join(' + ')}
+            </span>
+          )}
           {profile?.art_type && (
             <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.08em' }}>{profile.art_type.toUpperCase()}</span>
           )}
         </div>
-        <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.06em' }}>{timeAgo(post.created_at)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.06em' }}>{timeAgo(post.created_at)}</span>
+          <PostActionsMenu
+            isOwner={currentUserId === post.user_id}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onReport={handleReport}
+          />
+        </div>
       </div>
 
       {/* Title */}

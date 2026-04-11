@@ -35,10 +35,10 @@ export function SignUpPrompt({ message = 'JOIN WOA TO CONTINUE', onClose }: Prop
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Link href="/app/signup" className="btn-red" style={{ display: 'block', padding: '13px', fontSize: 11, letterSpacing: '0.14em', textDecoration: 'none' }}>
+          <Link href="/signup" className="btn-red" style={{ display: 'block', padding: '13px', fontSize: 11, letterSpacing: '0.14em', textDecoration: 'none' }}>
             CREATE ACCOUNT — FREE
           </Link>
-          <Link href="/app/login" style={{ display: 'block', padding: '13px', fontSize: 11, letterSpacing: '0.14em', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.12)', color: '#888880' }}>
+          <Link href="/login" style={{ display: 'block', padding: '13px', fontSize: 11, letterSpacing: '0.14em', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.12)', color: '#888880' }}>
             LOG IN
           </Link>
         </div>

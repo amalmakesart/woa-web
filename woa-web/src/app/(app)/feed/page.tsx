@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { SignUpPrompt } from '@/components/SignUpPrompt'
+import { PostActionsMenu } from '@/components/PostActionsMenu'
 
 type FeedTab = 'foryou' | 'following' | 'arttype' | 'location'
 
@@ -32,6 +34,11 @@ interface Post {
     art_type: string | null
     full_name: string | null
   } | null
+  collaborators?: {
+    id: string
+    username: string | null
+    full_name: string | null
+  }[]
 }
 
 function timeAgo(dateStr: string) {
@@ -53,6 +60,9 @@ function PostCard({
   bookmarkedIds,
   onLike,
   onBookmark,
+  onEdit,
+  onDelete,
+  onReport,
   onSignUp,
 }: {
   post: Post
@@ -61,11 +71,19 @@ function PostCard({
   bookmarkedIds: Set<string>
   onLike: (id: string) => void
   onBookmark: (id: string) => void
+  onEdit: (post: Post) => void
+  onDelete: (post: Post) => void
+  onReport: (post: Post) => void
   onSignUp: () => void
 }) {
   const isLiked = likedIds.has(post.id)
   const isBookmarked = bookmarkedIds.has(post.id)
   const profile = post.profiles
+  const isOwner = currentUserId === post.user_id
+  const collaboratorNames = (post.collaborators ?? [])
+    .map(c => c.username ?? c.full_name)
+    .filter(Boolean)
+    .map(name => `@${String(name).toUpperCase()}`)
 
   return (
     <article
@@ -118,6 +136,11 @@ function PostCard({
             >
               {profile?.username?.toUpperCase() ?? 'UNKNOWN'}
             </span>
+            {collaboratorNames.length > 0 && (
+              <span style={{ display: 'block', fontSize: 10, color: '#c0392b', letterSpacing: '0.06em', marginTop: 2 }}>
+                {collaboratorNames.join(' + ')}
+              </span>
+            )}
             {profile?.art_type && (
               <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.08em' }}>
                 {profile.art_type.toUpperCase()}
@@ -125,9 +148,17 @@ function PostCard({
             )}
           </Link>
         </div>
-        <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.08em' }}>
-          {timeAgo(post.created_at)}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.08em' }}>
+            {timeAgo(post.created_at)}
+          </span>
+          <PostActionsMenu
+            isOwner={isOwner}
+            onEdit={() => onEdit(post)}
+            onDelete={() => onDelete(post)}
+            onReport={() => onReport(post)}
+          />
+        </div>
       </div>
 
       {/* Title */}
@@ -271,6 +302,7 @@ function PostCard({
 }
 
 export default function FeedPage() {
+  const router = useRouter()
   const [tab, setTab] = useState<FeedTab>('foryou')
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
@@ -313,7 +345,29 @@ export default function FeedPage() {
           .select('id, username, profile_photo_url, art_type, full_name')
           .in('id', userIds)
         const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p]))
-        const enriched = posts.map(p => ({ ...p, profiles: profileMap[p.user_id] ?? null }))
+        const postIds = posts.map(p => p.id)
+        const { data: collaboratorRows } = await supabase
+          .from('post_collaborators')
+          .select('post_id, collaborator_id, accepted')
+          .in('post_id', postIds)
+          .eq('accepted', true)
+        const collaboratorIds = [...new Set((collaboratorRows ?? []).map((row: any) => row.collaborator_id))]
+        const { data: collaboratorProfiles } = collaboratorIds.length > 0
+          ? await supabase.from('profiles').select('id, username, full_name').in('id', collaboratorIds)
+          : { data: [] as any[] }
+        const collaboratorProfileMap = Object.fromEntries((collaboratorProfiles ?? []).map((p: any) => [p.id, p]))
+        const collaboratorMap = new Map<string, any[]>()
+        ;(collaboratorRows ?? []).forEach((row: any) => {
+          const existing = collaboratorMap.get(row.post_id) ?? []
+          const profile = collaboratorProfileMap[row.collaborator_id]
+          if (profile) existing.push(profile)
+          collaboratorMap.set(row.post_id, existing)
+        })
+        const enriched = posts.map(p => ({
+          ...p,
+          profiles: profileMap[p.user_id] ?? null,
+          collaborators: collaboratorMap.get(p.id) ?? [],
+        }))
         setPosts(enriched)
       } else {
         setPosts([])
@@ -374,6 +428,25 @@ export default function FeedPage() {
       await supabase.from('post_likes').insert({ post_id: postId, user_id: currentUserId })
       await supabase.rpc('increment_like_count', { post_id: postId })
     }
+  }
+
+  function handleEdit(post: Post) {
+    if (currentUserId !== post.user_id) return
+    router.push(`/feed/new?edit=${post.id}`)
+  }
+
+  async function handleDelete(post: Post) {
+    if (currentUserId !== post.user_id) return
+    if (!window.confirm('DELETE THIS POST? THIS CANNOT BE UNDONE.')) return
+
+    const supabase = createClient()
+    setPosts((prev) => prev.filter((item) => item.id !== post.id))
+    await supabase.from('posts').delete().eq('id', post.id)
+  }
+
+  function handleReport(post: Post) {
+    if (currentUserId === post.user_id) return
+    window.alert(`REPORTED @${post.profiles?.username?.toUpperCase() ?? 'USER'} — THANK YOU.`)
   }
 
   return (
@@ -453,6 +526,9 @@ export default function FeedPage() {
             bookmarkedIds={bookmarkedIds}
             onLike={handleLike}
             onBookmark={handleBookmark}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onReport={handleReport}
             onSignUp={() => setShowSignUp(true)}
           />
         ))
