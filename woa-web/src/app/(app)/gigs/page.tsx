@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { SignUpPrompt } from '@/components/SignUpPrompt'
 
 const GIG_TYPES = [
   'Photographer', 'Videographer', 'Filmmaker', 'Musician', 'Singer', 'DJ', 'Producer',
@@ -49,6 +50,7 @@ export default function GigsPage() {
   const [loading, setLoading] = useState(true)
   const [filterType, setFilterType] = useState('')
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [showSignUp, setShowSignUp] = useState(false)
 
   const loadGigs = useCallback(async () => {
     setLoading(true)
@@ -90,10 +92,14 @@ export default function GigsPage() {
       >
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.02em' }}>GIG BOARD</h1>
-          {currentUserId && (
+          {currentUserId ? (
             <Link href="/gigs/new" className="btn-red" style={{ fontSize: 10, padding: '6px 14px' }}>
               POST A GIG ↗
             </Link>
+          ) : (
+            <button onClick={() => setShowSignUp(true)} className="btn-red" style={{ fontSize: 10, padding: '6px 14px', cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}>
+              POST A GIG ↗
+            </button>
           )}
         </div>
 
@@ -196,6 +202,13 @@ export default function GigsPage() {
             </div>
           </Link>
         ))
+      )}
+
+      {showSignUp && (
+        <SignUpPrompt
+          message="JOIN WOA TO POST A GIG"
+          onClose={() => setShowSignUp(false)}
+        />
       )}
 
       <style>{`

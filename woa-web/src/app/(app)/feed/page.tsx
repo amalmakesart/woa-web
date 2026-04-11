@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { SignUpPrompt } from '@/components/SignUpPrompt'
 
 type FeedTab = 'foryou' | 'following' | 'arttype' | 'location'
 
@@ -52,6 +53,7 @@ function PostCard({
   bookmarkedIds,
   onLike,
   onBookmark,
+  onSignUp,
 }: {
   post: Post
   currentUserId: string | null
@@ -59,6 +61,7 @@ function PostCard({
   bookmarkedIds: Set<string>
   onLike: (id: string) => void
   onBookmark: (id: string) => void
+  onSignUp: () => void
 }) {
   const isLiked = likedIds.has(post.id)
   const isBookmarked = bookmarkedIds.has(post.id)
@@ -212,11 +215,11 @@ function PostCard({
       {/* Actions */}
       <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
         <button
-          onClick={() => currentUserId && onLike(post.id)}
+          onClick={() => currentUserId ? onLike(post.id) : onSignUp()}
           style={{
             background: 'none',
             border: 'none',
-            cursor: currentUserId ? 'pointer' : 'default',
+            cursor: 'pointer',
             color: isLiked ? '#c0392b' : '#888880',
             fontSize: 11,
             letterSpacing: '0.1em',
@@ -245,25 +248,23 @@ function PostCard({
           <span>◻</span>
           <span>{post.comment_count}</span>
         </Link>
-        {currentUserId && (
-          <button
-            onClick={() => onBookmark(post.id)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: isBookmarked ? '#f39c12' : '#888880',
-              fontSize: 13,
-              letterSpacing: '0.1em',
-              fontFamily: 'inherit',
-              marginLeft: 'auto',
-              transition: 'color 0.2s',
-            }}
-            title={isBookmarked ? 'Remove bookmark' : 'Save post'}
-          >
-            {isBookmarked ? '★' : '☆'}
-          </button>
-        )}
+        <button
+          onClick={() => currentUserId ? onBookmark(post.id) : onSignUp()}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: isBookmarked ? '#f39c12' : '#888880',
+            fontSize: 13,
+            letterSpacing: '0.1em',
+            fontFamily: 'inherit',
+            marginLeft: 'auto',
+            transition: 'color 0.2s',
+          }}
+          title={isBookmarked ? 'Remove bookmark' : 'Save post'}
+        >
+          {isBookmarked ? '★' : '☆'}
+        </button>
       </div>
     </article>
   )
@@ -276,6 +277,7 @@ export default function FeedPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set())
+  const [showSignUp, setShowSignUp] = useState(false)
 
   const loadFeed = useCallback(async (activeTab: FeedTab) => {
     setLoading(true)
@@ -388,9 +390,15 @@ export default function FeedPage() {
             <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: '0.04em' }}>WOA</span>
             <span style={{ color: '#c0392b', fontSize: 8 }}>●</span>
           </div>
-          <Link href="/feed/new" className="btn-red" style={{ fontSize: 10, padding: '6px 14px' }}>
-            + POST
-          </Link>
+          {currentUserId ? (
+            <Link href="/feed/new" className="btn-red" style={{ fontSize: 10, padding: '6px 14px' }}>
+              + POST
+            </Link>
+          ) : (
+            <button onClick={() => setShowSignUp(true)} className="btn-red" style={{ fontSize: 10, padding: '6px 14px', cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}>
+              + POST
+            </button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -439,8 +447,12 @@ export default function FeedPage() {
             bookmarkedIds={bookmarkedIds}
             onLike={handleLike}
             onBookmark={handleBookmark}
+            onSignUp={() => setShowSignUp(true)}
           />
         ))
+      )}
+      {showSignUp && (
+        <SignUpPrompt onClose={() => setShowSignUp(false)} />
       )}
     </div>
   )

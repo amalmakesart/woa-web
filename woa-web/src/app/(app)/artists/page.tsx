@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { SignUpPrompt } from '@/components/SignUpPrompt'
 
 const DISCIPLINES = [
   'Photographer', 'Musician', 'Videographer', 'Model', 'Dancer', 'Filmmaker',
@@ -157,6 +158,8 @@ export default function ArtistsPage() {
   const router = useRouter()
   const [allArtists, setAllArtists] = useState<Artist[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentUserId, setCurrentUserId] = useState<string | null | undefined>(undefined)
+  const [showSignUp, setShowSignUp] = useState(false)
 
   const [countryFilter, setCountryFilter] = useState<string | null>(null)
   const [cityFilter, setCityFilter] = useState<string | null>(null)
@@ -169,6 +172,8 @@ export default function ArtistsPage() {
 
   const loadArtists = useCallback(async () => {
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    setCurrentUserId(user?.id ?? null)
     const { data } = await supabase
       .from('profiles')
       .select('id, username, full_name, art_type, art_types, discipline, is_available, is_verified, profile_photo_url, city, country, follower_count')
@@ -391,7 +396,14 @@ export default function ArtistsPage() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
             {displayed.map(artist => (
-              <Link key={artist.id} href={`/artists/${artist.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+              <div
+                key={artist.id}
+                onClick={() => {
+                  if (currentUserId) router.push(`/artists/${artist.id}`)
+                  else setShowSignUp(true)
+                }}
+                style={{ textDecoration: 'none', display: 'block', cursor: 'pointer' }}
+              >
                 <div
                   style={{ position: 'relative', aspectRatio: '1/1', overflow: 'hidden', background: '#1a1a1a', cursor: 'pointer' }}
                   className="artist-card-hover"
@@ -434,7 +446,7 @@ export default function ArtistsPage() {
                     </span>
                   )}
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}
@@ -466,6 +478,13 @@ export default function ArtistsPage() {
         onSelect={setTagFilter} onClear={() => setTagFilter(null)}
         onClose={() => setActiveModal(null)}
       />
+
+      {showSignUp && (
+        <SignUpPrompt
+          message="JOIN WOA TO VIEW ARTIST PROFILES"
+          onClose={() => setShowSignUp(false)}
+        />
+      )}
 
       <style>{`
         .artist-card-hover:hover img { filter: brightness(0.55) !important; transform: scale(1.04); }

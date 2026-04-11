@@ -28,16 +28,16 @@ export async function proxy(request: NextRequest) {
   // With basePath '/app', middleware sees full paths like /app/feed
   const { pathname } = request.nextUrl
   const isAuthRoute = pathname.startsWith('/app/login') || pathname.startsWith('/app/signup')
-  const isAppRoute = pathname.startsWith('/app/feed') ||
-    pathname.startsWith('/app/artists') ||
-    pathname.startsWith('/app/gigs') ||
-    pathname.startsWith('/app/features') ||
+  // Routes that require authentication (personal/write actions)
+  const isProtectedRoute =
     pathname.startsWith('/app/messages') ||
     pathname.startsWith('/app/notifications') ||
     pathname.startsWith('/app/profile') ||
-    pathname.startsWith('/app/search')
+    pathname.startsWith('/app/search') ||
+    pathname.startsWith('/app/feed/new') ||
+    pathname.startsWith('/app/gigs/new')
 
-  if (!user && isAppRoute) {
+  if (!user && isProtectedRoute) {
     return NextResponse.redirect(new URL('/app/login', request.url))
   }
 
