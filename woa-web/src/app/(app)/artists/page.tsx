@@ -171,24 +171,29 @@ export default function ArtistsPage() {
   const [search, setSearch] = useState('')
 
   const loadArtists = useCallback(async () => {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    setCurrentUserId(user?.id ?? null)
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, username, full_name, art_type, art_types, discipline, is_available, is_verified, profile_photo_url, city, country, follower_count')
-      .in('role', ['ARTIST', 'COLLECTIVE'])
-      .order('created_at', { ascending: false })
-      .limit(300)
-    const mapped = ((data as any[]) ?? []).map(a => ({
-      ...a,
-      art_types: a.art_types ?? [],
-      discipline: a.discipline ?? null,
-      is_available: a.is_available ?? false,
-      is_verified: a.is_verified ?? false,
-    }))
-    setAllArtists(mapped as Artist[])
-    setLoading(false)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUserId(user?.id ?? null)
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, art_type, art_types, discipline, is_available, is_verified, profile_photo_url, city, country, follower_count')
+        .in('role', ['ARTIST', 'COLLECTIVE'])
+        .order('created_at', { ascending: false })
+        .limit(300)
+      const mapped = ((data as any[]) ?? []).map(a => ({
+        ...a,
+        art_types: a.art_types ?? [],
+        discipline: a.discipline ?? null,
+        is_available: a.is_available ?? false,
+        is_verified: a.is_verified ?? false,
+      }))
+      setAllArtists(mapped as Artist[])
+    } catch (e) {
+      console.error('Failed to load artists:', e)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { loadArtists() }, [loadArtists])

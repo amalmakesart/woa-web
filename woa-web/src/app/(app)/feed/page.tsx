@@ -281,53 +281,59 @@ export default function FeedPage() {
 
   const loadFeed = useCallback(async (activeTab: FeedTab) => {
     setLoading(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    setCurrentUserId(user?.id ?? null)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUserId(user?.id ?? null)
 
-    let postsQuery = supabase
-      .from('posts')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(30)
+      let postsQuery = supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(30)
 
-    if (activeTab === 'following' && user) {
-      const { data: follows } = await supabase
-        .from('follows')
-        .select('following_id')
-        .eq('follower_id', user.id)
-      const ids = (follows ?? []).map((f: any) => f.following_id)
-      if (ids.length > 0) postsQuery = postsQuery.in('user_id', ids)
-      else { setPosts([]); setLoading(false); return }
-    }
+      if (activeTab === 'following' && user) {
+        const { data: follows } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id)
+        const ids = (follows ?? []).map((f: any) => f.following_id)
+        if (ids.length > 0) postsQuery = postsQuery.in('user_id', ids)
+        else { setPosts([]); return }
+      }
 
-    const { data: postsData } = await postsQuery
-    const posts = (postsData as Post[]) ?? []
+      const { data: postsData } = await postsQuery
+      const posts = (postsData as Post[]) ?? []
 
-    // Fetch profiles separately to avoid join issues
-    if (posts.length > 0) {
-      const userIds = [...new Set(posts.map(p => p.user_id))]
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, username, profile_photo_url, art_type, full_name')
-        .in('id', userIds)
-      const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p]))
-      const enriched = posts.map(p => ({ ...p, profiles: profileMap[p.user_id] ?? null }))
-      setPosts(enriched)
-    } else {
+      // Fetch profiles separately to avoid join issues
+      if (posts.length > 0) {
+        const userIds = [...new Set(posts.map(p => p.user_id))]
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username, profile_photo_url, art_type, full_name')
+          .in('id', userIds)
+        const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p]))
+        const enriched = posts.map(p => ({ ...p, profiles: profileMap[p.user_id] ?? null }))
+        setPosts(enriched)
+      } else {
+        setPosts([])
+      }
+
+      if (user && posts.length > 0) {
+        const postIds = posts.map(p => p.id)
+        const [{ data: likes }, { data: bookmarks }] = await Promise.all([
+          supabase.from('post_likes').select('post_id').eq('user_id', user.id).in('post_id', postIds),
+          supabase.from('bookmarks').select('post_id').eq('user_id', user.id).in('post_id', postIds),
+        ])
+        setLikedIds(new Set((likes ?? []).map((l: any) => l.post_id)))
+        setBookmarkedIds(new Set((bookmarks ?? []).map((b: any) => b.post_id)))
+      }
+    } catch (e) {
+      console.error('Failed to load feed:', e)
       setPosts([])
+    } finally {
+      setLoading(false)
     }
-
-    if (user && posts.length > 0) {
-      const postIds = posts.map(p => p.id)
-      const [{ data: likes }, { data: bookmarks }] = await Promise.all([
-        supabase.from('post_likes').select('post_id').eq('user_id', user.id).in('post_id', postIds),
-        supabase.from('bookmarks').select('post_id').eq('user_id', user.id).in('post_id', postIds),
-      ])
-      setLikedIds(new Set((likes ?? []).map((l: any) => l.post_id)))
-      setBookmarkedIds(new Set((bookmarks ?? []).map((b: any) => b.post_id)))
-    }
-    setLoading(false)
   }, [])
 
   useEffect(() => { loadFeed(tab) }, [tab, loadFeed])

@@ -54,23 +54,29 @@ export default function GigsPage() {
 
   const loadGigs = useCallback(async () => {
     setLoading(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    setCurrentUserId(user?.id ?? null)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUserId(user?.id ?? null)
 
-    let query = supabase
-      .from('gigs')
-      .select('*')
-      .eq('status', 'active')
-      .order('is_featured', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(50)
+      let query = supabase
+        .from('gigs')
+        .select('*')
+        .eq('status', 'active')
+        .order('is_featured', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(50)
 
-    if (filterType) query = query.eq('art_type', filterType)
+      if (filterType) query = query.eq('art_type', filterType)
 
-    const { data } = await query
-    setGigs((data as Gig[]) ?? [])
-    setLoading(false)
+      const { data } = await query
+      setGigs((data as Gig[]) ?? [])
+    } catch (e) {
+      console.error('Failed to load gigs:', e)
+      setGigs([])
+    } finally {
+      setLoading(false)
+    }
   }, [filterType])
 
   useEffect(() => { loadGigs() }, [loadGigs])
