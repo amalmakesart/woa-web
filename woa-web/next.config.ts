@@ -1,11 +1,9 @@
 import type { NextConfig } from "next";
+import { publicSupabaseEnv } from "./src/lib/supabase/config";
 
 const nextConfig: NextConfig = {
   basePath: '/app',
-  env: {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  },
+  env: publicSupabaseEnv,
   turbopack: {
     root: __dirname,
   },
