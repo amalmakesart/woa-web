@@ -95,6 +95,15 @@ export default function HomePage() {
         </Link>
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <a
+            href="https://apps.apple.com/ca/app/work-er-of-art/id6761753841"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary"
+            style={{ padding: '10px 18px', fontSize: 10, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            ⬇ APP STORE
+          </a>
           <Link href="/feed" className="btn-primary" style={{ padding: '10px 18px', fontSize: 10 }}>
             OPEN APP
           </Link>
@@ -201,6 +210,14 @@ export default function HomePage() {
                 <Link href="/gigs" className="btn-red">
                   VIEW GIGS
                 </Link>
+                <a
+                  href="https://apps.apple.com/ca/app/work-er-of-art/id6761753841"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: 11, color: '#f5c842', letterSpacing: '0.1em', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, paddingTop: 4 }}
+                >
+                  ⬇ DOWNLOAD ON THE APP STORE
+                </a>
               </div>
             </div>
           </div>
@@ -389,6 +406,15 @@ export default function HomePage() {
             <Link href="/feed" className="btn-primary">
               OPEN WEB APP
             </Link>
+            <a
+              href="https://apps.apple.com/ca/app/work-er-of-art/id6761753841"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary"
+              style={{ textDecoration: 'none' }}
+            >
+              ⬇ APP STORE
+            </a>
           </div>
         </div>
       </section>
@@ -423,6 +449,14 @@ export default function HomePage() {
             <Link href="/feed" style={{ fontSize: 11, color: '#888880', textDecoration: 'none', letterSpacing: '0.08em' }}>
               WEB APP
             </Link>
+            <a
+              href="https://apps.apple.com/ca/app/work-er-of-art/id6761753841"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 11, color: '#f5c842', textDecoration: 'none', letterSpacing: '0.08em' }}
+            >
+              APP STORE
+            </a>
           </div>
         </div>
       </footer>
