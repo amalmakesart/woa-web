@@ -13,7 +13,15 @@ interface Feature {
   duration: string | null
   artist_id: string | null
   created_at: string
-  profiles?: { username: string | null; city: string | null; country: string | null } | null
+  artist?: {
+    id: string
+    username: string | null
+    full_name: string | null
+    profile_photo_url: string | null
+    art_type: string | null
+    city: string | null
+    country: string | null
+  } | null
 }
 
 export default function FeaturesPage() {
@@ -27,13 +35,100 @@ export default function FeaturesPage() {
       const supabase = createClient()
       const { data } = await supabase
         .from('features')
-        .select('*, profiles(username, city, country)')
+        .select('id, title, description, thumbnail_url, video_url, duration, artist_id, created_at')
         .order('created_at', { ascending: false })
-      setFeatures((data as Feature[]) ?? [])
+
+      const baseFeatures = ((data as Feature[]) ?? []).map((feature) => ({
+        ...feature,
+        artist: null,
+      }))
+
+      const artistIds = [...new Set(baseFeatures.map((feature) => feature.artist_id).filter(Boolean))] as string[]
+      if (artistIds.length === 0) {
+        setFeatures(baseFeatures)
+        setLoading(false)
+        return
+      }
+
+      const { data: artistRows } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, profile_photo_url, art_type, city, country')
+        .in('id', artistIds)
+
+      const artistMap = Object.fromEntries(((artistRows as any[]) ?? []).map((artist) => [artist.id, artist]))
+      setFeatures(baseFeatures.map((feature) => ({
+        ...feature,
+        artist: feature.artist_id ? artistMap[feature.artist_id] ?? null : null,
+      })))
       setLoading(false)
     }
     load()
   }, [])
+
+  function renderLinkedArtist(feature: Feature, compact = false) {
+    if (!feature.artist) return null
+
+    const name = feature.artist.username
+      ? `@${feature.artist.username.toUpperCase()}`
+      : (feature.artist.full_name ?? 'LINKED ARTIST').toUpperCase()
+
+    return (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          router.push(`/artists/${feature.artist?.id}`)
+        }}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 10,
+          marginTop: compact ? 8 : 12,
+          padding: 0,
+          border: 'none',
+          background: 'transparent',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+        }}
+      >
+        {feature.artist.profile_photo_url ? (
+          <img
+            src={feature.artist.profile_photo_url}
+            alt={feature.artist.full_name ?? feature.artist.username ?? 'Linked artist'}
+            className="oct-avatar"
+            style={{ width: compact ? 22 : 26, height: compact ? 22 : 26, flexShrink: 0 }}
+          />
+        ) : (
+          <div
+            className="oct-avatar"
+            style={{
+              width: compact ? 22 : 26,
+              height: compact ? 22 : 26,
+              background: '#1a1a1a',
+              color: '#888880',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 10,
+              flexShrink: 0,
+            }}
+          >
+            ◯
+          </div>
+        )}
+        <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+          <span style={{ fontSize: compact ? 10 : 11, color: '#fff', letterSpacing: '0.08em' }}>
+            {name}
+          </span>
+          {feature.artist.art_type && (
+            <span style={{ fontSize: 9, color: '#c0392b', letterSpacing: '0.08em' }}>
+              {feature.artist.art_type.toUpperCase()}
+            </span>
+          )}
+        </span>
+      </button>
+    )
+  }
 
   const [hero, ...rest] = features
 
@@ -127,11 +222,12 @@ export default function FeaturesPage() {
                     <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '0.03em', marginBottom: 4 }}>
                       {hero.title}
                     </h2>
-                    {hero.profiles && (
+                    {hero.artist && (
                       <p style={{ fontSize: 12, color: '#888880', letterSpacing: '0.1em' }}>
-                        {[hero.profiles.city, hero.profiles.country].filter(Boolean).join(', ').toUpperCase()}
+                        {[hero.artist.city, hero.artist.country].filter(Boolean).join(', ').toUpperCase()}
                       </p>
                     )}
+                    {renderLinkedArtist(hero)}
                   </div>
                 </>
               )}
@@ -185,11 +281,12 @@ export default function FeaturesPage() {
                   <span style={{ display: 'block', fontSize: 15, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>
                     {feat.title}
                   </span>
-                  {feat.profiles && (
+                  {feat.artist && (
                     <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.08em' }}>
-                      {[feat.profiles.city, feat.profiles.country].filter(Boolean).join(', ').toUpperCase()}
+                      {[feat.artist.city, feat.artist.country].filter(Boolean).join(', ').toUpperCase()}
                     </span>
                   )}
+                  {renderLinkedArtist(feat, true)}
                 </div>
 
                 {feat.duration && (

@@ -23,12 +23,12 @@ const FEATURES = [
   {
     number: '03',
     title: 'POST REAL GIGS',
-    description: 'Create opportunities, review interest, and message the right artists directly from the same platform.',
+    description: 'Create opportunities, review interest, and connect with the right artists directly from the same platform.',
   },
   {
     number: '04',
-    title: 'BUILD YOUR NAME',
-    description: 'Create a profile that feels like a living portfolio and lets people find you for the work you actually want.',
+    title: 'START A COLLAB',
+    description: 'Launch creative collabs, set the discipline, location, and budget, then gather the right people under one project thread.',
   },
 ]
 
@@ -50,6 +50,42 @@ const GIGS = [
     meta: 'PHOTOGRAPHER · MAY 11 · TORONTO',
     budget: '$350 DAY RATE',
     interest: '12 INTERESTED',
+  },
+]
+
+const COLLABS = [
+  {
+    title: 'SHORT FILM SEEKING TWO ACTORS + ONE CINEMATOGRAPHER',
+    meta: 'FILMMAKER · CALGARY, CANADA',
+    budget: '$1,200 PRODUCTION POOL',
+    status: '11 COMMENTS',
+  },
+  {
+    title: 'COMMUNITY MURAL LOOKING FOR PAINTERS AND DOCUMENTATION SUPPORT',
+    meta: 'MURALIST · VANCOUVER, CANADA',
+    budget: 'MATERIALS + HONORARIUM',
+    status: '6 COMMENTS',
+  },
+  {
+    title: 'LIVE PERFORMANCE TEAM BUILDING A MULTIDISCIPLINARY SHOW',
+    meta: 'PERFORMER · REMOTE',
+    budget: 'REV SHARE + GRANT BUDGET',
+    status: '9 COMMENTS',
+  },
+]
+
+const ROLES = [
+  {
+    title: 'ARTISTS',
+    description: 'Build a profile, share the work, and get discovered by collaborators, collectives, and gig posters.',
+  },
+  {
+    title: 'ART COLLECTIVES',
+    description: 'Register as a collective, publish your identity, and recruit artists for projects, programs, events, and productions.',
+  },
+  {
+    title: 'GIG POSTERS',
+    description: 'Post opportunities, review interest, and hire the right creative team without leaving the platform.',
   },
 ]
 
@@ -100,13 +136,10 @@ export default function HomePage() {
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary"
-            style={{ padding: '10px 18px', fontSize: 10, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            style={{ padding: '10px 18px', fontSize: 10, textDecoration: 'none' }}
           >
-            ⬇ APP STORE
-          </a>
-          <Link href="/feed" className="btn-primary" style={{ padding: '10px 18px', fontSize: 10 }}>
             OPEN APP
-          </Link>
+          </a>
           <Link href="/signup" className="btn-red" style={{ padding: '10px 18px', fontSize: 10 }}>
             JOIN FREE
           </Link>
@@ -199,25 +232,17 @@ export default function HomePage() {
                 WORK.
               </h1>
               <p style={{ fontSize: 13, color: '#b0b0aa', lineHeight: 1.9, maxWidth: 520, marginBottom: 36 }}>
-                DISCOVER ARTISTS. POST GIGS. BUILD YOUR PORTFOLIO.
+                DISCOVER ARTISTS. POST GIGS. START COLLABS. BUILD YOUR PORTFOLIO.
                 <br />
-                A PLATFORM BUILT FOR ARTISTS BY ARTISTS.
+                A PLATFORM BUILT FOR ARTISTS, COLLECTIVES, AND CREATIVE HIRERS.
               </p>
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                 <Link href="/artists" className="btn-primary">
                   EXPLORE ARTISTS
                 </Link>
-                <Link href="/gigs" className="btn-red">
-                  VIEW GIGS
+                <Link href="/projects" className="btn-red">
+                  OPEN COLLAB
                 </Link>
-                <a
-                  href="https://apps.apple.com/ca/app/work-er-of-art/id6761753841"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: 11, color: '#f5c842', letterSpacing: '0.1em', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, paddingTop: 4 }}
-                >
-                  ⬇ DOWNLOAD ON THE APP STORE
-                </a>
               </div>
             </div>
           </div>
@@ -247,6 +272,8 @@ export default function HomePage() {
             'DANCERS',
             'SCULPTORS',
             'WRITERS',
+            'ART COLLECTIVES',
+            'COLLAB LEADS',
           ]
             .concat([
               'VISUAL ARTISTS',
@@ -261,6 +288,8 @@ export default function HomePage() {
               'DANCERS',
               'SCULPTORS',
               'WRITERS',
+              'ART COLLECTIVES',
+              'COLLAB LEADS',
             ])
             .map((label, index) => (
               <span
@@ -351,6 +380,27 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section style={{ padding: '92px 24px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+        <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+          <div className="woa-section-label">WHO IT'S FOR</div>
+          <div className="landing-role-grid">
+            {ROLES.map((role) => (
+              <div
+                key={role.title}
+                style={{
+                  padding: '34px 28px',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0))',
+                }}
+              >
+                <h3 style={{ fontSize: 18, letterSpacing: '0.04em', marginBottom: 12 }}>{role.title}</h3>
+                <p style={{ fontSize: 12, color: '#a7a7a2', lineHeight: 1.85 }}>{role.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section style={{ padding: '92px 24px', borderBottom: '1px solid rgba(255,255,255,0.12)' }} id="gigs">
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div className="woa-section-label">GIGS</div>
@@ -388,6 +438,52 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section style={{ padding: '92px 24px', borderBottom: '1px solid rgba(255,255,255,0.12)' }} id="collab">
+        <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+          <div className="woa-section-label">COLLAB</div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', marginBottom: 30 }}>
+            <h2 style={{ fontSize: 'clamp(30px, 5vw, 54px)', lineHeight: 1, letterSpacing: '-0.02em' }}>
+              BUILD THE TEAM.
+            </h2>
+            <Link href="/projects" className="btn-red" style={{ fontSize: 11, padding: '10px 20px' }}>
+              OPEN COLLAB ↗
+            </Link>
+          </div>
+
+          <p style={{ fontSize: 12, color: '#a7a7a2', lineHeight: 1.9, maxWidth: 640, marginBottom: 28 }}>
+            The Collab tab lets artists and collectives post a project, set the discipline, location, and budget,
+            then gather comments and interest in one place until the project is closed.
+          </p>
+
+          {COLLABS.map((collab, index) => (
+            <div
+              key={collab.title}
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+                gap: 24,
+                padding: '28px 0',
+                borderTop: index === 0 ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                borderBottom: '1px solid rgba(255,255,255,0.12)',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 260 }}>
+                <span style={{ display: 'block', fontSize: 'clamp(18px, 3vw, 28px)', marginBottom: 8, lineHeight: 1.2 }}>
+                  {collab.title}
+                </span>
+                <span style={{ fontSize: 11, color: '#c0392b', letterSpacing: '0.08em' }}>{collab.meta}</span>
+              </div>
+              <div style={{ textAlign: 'right', minWidth: 160 }}>
+                <span style={{ display: 'block', fontSize: 18, fontWeight: 700, marginBottom: 6 }}>{collab.budget}</span>
+                <span style={{ fontSize: 11, color: '#888880', letterSpacing: '0.08em' }}>{collab.status}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section style={{ padding: '104px 24px', textAlign: 'center' }}>
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
           <h2 style={{ fontSize: 'clamp(38px, 7vw, 86px)', lineHeight: 0.94, letterSpacing: '-0.02em', marginBottom: 28 }}>
@@ -396,15 +492,12 @@ export default function HomePage() {
             <span style={{ color: '#888880', fontStyle: 'italic', fontWeight: 400 }}>SPEAK</span> FIRST.
           </h2>
           <p style={{ fontSize: 13, color: '#a7a7a2', lineHeight: 1.9, marginBottom: 40 }}>
-            WOA is completely free to use, takes no commission, and exists to help artists get seen,
-            get hired, and build lasting creative momentum.
+            WOA is completely free to use, takes no commission, and exists to help artists, collectives,
+            and creative teams get seen, get connected, and build lasting momentum.
           </p>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/signup" className="btn-red">
               CREATE ACCOUNT
-            </Link>
-            <Link href="/feed" className="btn-primary">
-              OPEN WEB APP
             </Link>
             <a
               href="https://apps.apple.com/ca/app/work-er-of-art/id6761753841"
@@ -413,7 +506,7 @@ export default function HomePage() {
               className="btn-primary"
               style={{ textDecoration: 'none' }}
             >
-              ⬇ APP STORE
+              OPEN APP
             </a>
           </div>
         </div>
@@ -449,14 +542,6 @@ export default function HomePage() {
             <Link href="/feed" style={{ fontSize: 11, color: '#888880', textDecoration: 'none', letterSpacing: '0.08em' }}>
               WEB APP
             </Link>
-            <a
-              href="https://apps.apple.com/ca/app/work-er-of-art/id6761753841"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontSize: 11, color: '#f5c842', textDecoration: 'none', letterSpacing: '0.08em' }}
-            >
-              APP STORE
-            </a>
           </div>
         </div>
       </footer>
@@ -477,6 +562,11 @@ export default function HomePage() {
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 0;
         }
+        .landing-role-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 0;
+        }
         @keyframes landingTicker {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
@@ -486,7 +576,8 @@ export default function HomePage() {
             grid-template-columns: 1fr !important;
           }
           .landing-artist-grid,
-          .landing-feature-grid {
+          .landing-feature-grid,
+          .landing-role-grid {
             grid-template-columns: 1fr !important;
           }
         }

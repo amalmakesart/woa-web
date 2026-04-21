@@ -7,7 +7,7 @@ const NAV = [
   { href: '/feed', label: 'FEED', icon: '◈' },
   { href: '/artists', label: 'ARTISTS', icon: '◉' },
   { href: '/gigs', label: 'GIGS', icon: '◎' },
-  { href: '/search', label: 'SEARCH', icon: '⊙' },
+  { href: '/projects', label: 'COLLAB', icon: '◇' },
   { href: '/messages', label: 'MSG', icon: '◻' },
   { href: '/profile', label: 'ME', icon: '◯' },
 ]

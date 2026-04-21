@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { isAdminEmail } from '@/lib/admin'
 
 const DISCIPLINES = [
   'VISUAL ARTIST', 'PHOTOGRAPHER', 'VIDEOGRAPHER', 'FILMMAKER',
@@ -32,11 +33,13 @@ const EXPERIENCE_OPTIONS = ['< 1 YEAR', '1-2 YEARS', '3-5 YEARS', '6-10 YEARS', 
 
 export default function EditProfilePage() {
   const router = useRouter()
+  const [targetId, setTargetId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [role, setRole] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const [fullName, setFullName] = useState('')
   const [username, setUsername] = useState('')
@@ -55,12 +58,25 @@ export default function EditProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState('')
   const [uploading, setUploading] = useState(false)
 
+  const normalizedRole = (role ?? '').toUpperCase()
+  const isGigPoster = normalizedRole === 'GIG_POSTER'
+  const isCollective = normalizedRole === 'COLLECTIVE'
+  const showArtistFields = !isGigPoster && !isCollective
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setTargetId(new URLSearchParams(window.location.search).get('target'))
+  }, [])
+
   useEffect(() => {
     async function load() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      const admin = isAdminEmail(user.email)
+      setIsAdmin(admin)
+      const profileId = targetId && admin ? targetId : user.id
+      const { data } = await supabase.from('profiles').select('*').eq('id', profileId).single()
       if (data) {
         const d = data as any
         setFullName(d.full_name ?? '')
@@ -83,7 +99,7 @@ export default function EditProfilePage() {
       setLoading(false)
     }
     load()
-  }, [router])
+  }, [router, targetId])
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -93,7 +109,8 @@ export default function EditProfilePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const ext = file.name.split('.').pop()
-    const path = `${user.id}/avatar.${ext}`
+    const profileId = targetId && isAdmin ? targetId : user.id
+    const path = `${profileId}/avatar.${ext}`
     const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
     if (!upErr) {
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
@@ -117,33 +134,36 @@ export default function EditProfilePage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    const profileId = targetId && isAdmin ? targetId : user.id
 
     const updates: Record<string, any> = {
       full_name: fullName || null,
       username: username.toLowerCase().trim() || null,
-      art_type: artType || null,
-      art_types: artTypes.length > 0 ? artTypes : null,
       city: city || null,
       country: country || null,
       bio: bio || null,
-      experience: experience || null,
       instagram: instagram || null,
       facebook: facebook || null,
       website: website || null,
-      spotify_url: spotifyUrl || null,
-      is_available: isAvailable,
       profile_photo_url: avatarUrl || null,
+    }
+    if (showArtistFields) {
+      updates.art_type = artType || null
+      updates.art_types = artTypes.length > 0 ? artTypes : null
+      updates.experience = experience || null
+      updates.spotify_url = spotifyUrl || null
+      updates.is_available = isAvailable
     }
     if (role === 'GIG_POSTER') {
       updates.company_name = companyName || null
     }
 
-    const { error: err } = await supabase.from('profiles').update(updates).eq('id', user.id)
+    const { error: err } = await supabase.from('profiles').update(updates).eq('id', profileId)
 
     if (err) { setError(err.message); setSaving(false); return }
     setSuccess(true)
     setSaving(false)
-    setTimeout(() => { router.push('/profile') }, 800)
+    setTimeout(() => { router.push(targetId && isAdmin ? `/artists/${profileId}` : '/profile') }, 800)
   }
 
   if (loading) {
@@ -160,7 +180,9 @@ export default function EditProfilePage() {
         ← BACK
       </button>
 
-      <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 32 }}>EDIT PROFILE</h1>
+      <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 32 }}>
+        {targetId && isAdmin ? 'ADMIN EDIT PROFILE' : 'EDIT PROFILE'}
+      </h1>
 
       {/* Avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32 }}>
@@ -192,7 +214,7 @@ export default function EditProfilePage() {
               <label className="woa-input-label">USERNAME</label>
               <input className="woa-input" value={username} onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="username" />
             </div>
-            {role === 'GIG_POSTER' && (
+            {isGigPoster && (
               <div>
                 <label className="woa-input-label">COMPANY / VENUE NAME</label>
                 <input className="woa-input" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Your company or venue" />
@@ -215,76 +237,78 @@ export default function EditProfilePage() {
         </div>
 
         {/* Art discipline */}
-        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 20 }}>
-          <p style={{ fontSize: 9, letterSpacing: '0.2em', color: '#555', marginBottom: 14 }}>DISCIPLINE & EXPERIENCE</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div>
-              <label className="woa-input-label">MAIN DISCIPLINE</label>
-              <select className="woa-input" value={artType} onChange={e => setArtType(e.target.value)} style={{ cursor: 'pointer' }}>
-                <option value="">SELECT DISCIPLINE</option>
-                {DISCIPLINES.map(d => <option key={d} value={d} style={{ background: '#111' }}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="woa-input-label">YEARS OF EXPERIENCE</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {EXPERIENCE_OPTIONS.map(opt => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setExperience(experience === opt ? '' : opt)}
-                    style={{
-                      padding: '8px 14px',
-                      fontSize: 10,
-                      letterSpacing: '0.08em',
-                      border: experience === opt ? '1px solid #fff' : '1px solid #333',
-                      background: experience === opt ? '#fff' : 'transparent',
-                      color: experience === opt ? '#000' : '#888',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    {opt}
-                  </button>
-                ))}
+        {showArtistFields && (
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 20 }}>
+            <p style={{ fontSize: 9, letterSpacing: '0.2em', color: '#555', marginBottom: 14 }}>DISCIPLINE & EXPERIENCE</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label className="woa-input-label">MAIN DISCIPLINE</label>
+                <select className="woa-input" value={artType} onChange={e => setArtType(e.target.value)} style={{ cursor: 'pointer' }}>
+                  <option value="">SELECT DISCIPLINE</option>
+                  {DISCIPLINES.map(d => <option key={d} value={d} style={{ background: '#111' }}>{d}</option>)}
+                </select>
               </div>
-            </div>
-            <div>
-              <label className="woa-input-label">ART TYPES (SELECT UP TO 5)</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                {ALL_ART_TYPES.map(type => {
-                  const active = artTypes.includes(type)
-                  const disabled = !active && artTypes.length >= 5
-                  return (
+              <div>
+                <label className="woa-input-label">YEARS OF EXPERIENCE</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {EXPERIENCE_OPTIONS.map(opt => (
                     <button
-                      key={type}
+                      key={opt}
                       type="button"
-                      onClick={() => !disabled && toggleArtType(type)}
+                      onClick={() => setExperience(experience === opt ? '' : opt)}
                       style={{
-                        padding: '5px 10px',
-                        fontSize: 9,
+                        padding: '8px 14px',
+                        fontSize: 10,
                         letterSpacing: '0.08em',
-                        border: active ? '1px solid #c0392b' : '1px solid #2a2a2a',
-                        background: active ? 'rgba(192,57,43,0.12)' : 'transparent',
-                        color: active ? '#c0392b' : disabled ? '#333' : '#666',
-                        cursor: disabled ? 'not-allowed' : 'pointer',
+                        border: experience === opt ? '1px solid #fff' : '1px solid #333',
+                        background: experience === opt ? '#fff' : 'transparent',
+                        color: experience === opt ? '#000' : '#888',
+                        cursor: 'pointer',
                         fontFamily: 'inherit',
-                        opacity: disabled ? 0.5 : 1,
                       }}
                     >
-                      {type}
+                      {opt}
                     </button>
-                  )
-                })}
+                  ))}
+                </div>
               </div>
-              {artTypes.length > 0 && (
-                <p style={{ fontSize: 10, color: '#888', marginTop: 8, letterSpacing: '0.06em' }}>
-                  {artTypes.length}/5 SELECTED
-                </p>
-              )}
+              <div>
+                <label className="woa-input-label">ART TYPES (SELECT UP TO 5)</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                  {ALL_ART_TYPES.map(type => {
+                    const active = artTypes.includes(type)
+                    const disabled = !active && artTypes.length >= 5
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => !disabled && toggleArtType(type)}
+                        style={{
+                          padding: '5px 10px',
+                          fontSize: 9,
+                          letterSpacing: '0.08em',
+                          border: active ? '1px solid #c0392b' : '1px solid #2a2a2a',
+                          background: active ? 'rgba(192,57,43,0.12)' : 'transparent',
+                          color: active ? '#c0392b' : disabled ? '#333' : '#666',
+                          cursor: disabled ? 'not-allowed' : 'pointer',
+                          fontFamily: 'inherit',
+                          opacity: disabled ? 0.5 : 1,
+                        }}
+                      >
+                        {type}
+                      </button>
+                    )
+                  })}
+                </div>
+                {artTypes.length > 0 && (
+                  <p style={{ fontSize: 10, color: '#888', marginTop: 8, letterSpacing: '0.06em' }}>
+                    {artTypes.length}/5 SELECTED
+                  </p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Location */}
         <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 20 }}>
@@ -320,29 +344,31 @@ export default function EditProfilePage() {
               <label className="woa-input-label">WEBSITE</label>
               <input className="woa-input" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://yoursite.com" />
             </div>
-            <div>
-              <label className="woa-input-label">SPOTIFY / SOUNDCLOUD</label>
-              <input className="woa-input" value={spotifyUrl} onChange={e => setSpotifyUrl(e.target.value)} placeholder="https://open.spotify.com/..." />
-            </div>
+            {showArtistFields && (
+              <div>
+                <label className="woa-input-label">SPOTIFY / SOUNDCLOUD</label>
+                <input className="woa-input" value={spotifyUrl} onChange={e => setSpotifyUrl(e.target.value)} placeholder="https://open.spotify.com/..." />
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Availability */}
-        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 20 }}>
-          <p style={{ fontSize: 9, letterSpacing: '0.2em', color: '#555', marginBottom: 14 }}>AVAILABILITY</p>
-          <button
-            type="button"
-            onClick={() => setIsAvailable(!isAvailable)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-            }}
-          >
+        {showArtistFields && (
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 20 }}>
+            <p style={{ fontSize: 9, letterSpacing: '0.2em', color: '#555', marginBottom: 14 }}>AVAILABILITY</p>
+            <button
+              type="button"
+              onClick={() => setIsAvailable(!isAvailable)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
             <div style={{
               width: 44,
               height: 24,
@@ -366,8 +392,9 @@ export default function EditProfilePage() {
             <span style={{ fontSize: 12, letterSpacing: '0.08em', color: isAvailable ? '#2ecc71' : '#888880', fontFamily: 'inherit' }}>
               {isAvailable ? 'AVAILABLE FOR BOOKINGS' : 'NOT AVAILABLE'}
             </span>
-          </button>
-        </div>
+            </button>
+          </div>
+        )}
 
         {error && <p style={{ fontSize: 11, color: '#c0392b', letterSpacing: '0.06em' }}>{error}</p>}
         {success && <p style={{ fontSize: 11, color: '#2ecc71', letterSpacing: '0.06em' }}>SAVED!</p>}

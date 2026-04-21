@@ -18,6 +18,7 @@ interface Artist {
   id: string
   username: string | null
   full_name: string | null
+  role: string | null
   profile_photo_url: string | null
   art_type: string | null
   art_types: string[] | null
@@ -166,6 +167,7 @@ export default function ArtistsPage() {
   const [disciplineFilter, setDisciplineFilter] = useState<string | null>(null)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [availableOnly, setAvailableOnly] = useState(false)
+  const [collectivesOnly, setCollectivesOnly] = useState(false)
   const [verifiedOnly, setVerifiedOnly] = useState(false)
   const [activeModal, setActiveModal] = useState<'country' | 'city' | 'discipline' | 'tag' | null>(null)
   const [search, setSearch] = useState('')
@@ -177,7 +179,7 @@ export default function ArtistsPage() {
       setCurrentUserId(user?.id ?? null)
       const { data } = await supabase
         .from('profiles')
-        .select('id, username, full_name, art_type, art_types, discipline, is_available, is_verified, profile_photo_url, city, country, follower_count')
+        .select('id, username, full_name, role, art_type, art_types, discipline, is_available, is_verified, profile_photo_url, city, country, follower_count')
         .in('role', ['ARTIST', 'COLLECTIVE'])
         .order('created_at', { ascending: false })
         .limit(300)
@@ -241,9 +243,10 @@ export default function ArtistsPage() {
       (a.art_types ?? []).some(t => t.toLowerCase() === tagFilter.toLowerCase())
     )
     if (availableOnly) result = result.filter(a => a.is_available)
+    if (collectivesOnly) result = result.filter(a => a.role === 'COLLECTIVE')
     if (verifiedOnly) result = result.filter(a => a.is_verified)
     return result
-  }, [allArtists, search, countryFilter, cityFilter, disciplineFilter, tagFilter, availableOnly, verifiedOnly])
+  }, [allArtists, search, countryFilter, cityFilter, disciplineFilter, tagFilter, availableOnly, collectivesOnly, verifiedOnly])
 
   function shuffle() {
     setAllArtists(prev => {
@@ -363,6 +366,19 @@ export default function ArtistsPage() {
           <span style={{ fontSize: 10, letterSpacing: '0.12em', color: availableOnly ? '#2a7a4f' : '#9a9a9a' }}>AVAILABLE</span>
         </button>
         <button
+          onClick={() => setCollectivesOnly(v => !v)}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '10px 0',
+            background: collectivesOnly ? '#140404' : 'transparent',
+            border: 'none', borderRight: border,
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          <span style={{ fontSize: 12, color: collectivesOnly ? '#c0392b' : '#555' }}>◌</span>
+          <span style={{ fontSize: 10, letterSpacing: '0.12em', color: collectivesOnly ? '#c0392b' : '#9a9a9a' }}>COLLECTIVES</span>
+        </button>
+        <button
           onClick={() => setVerifiedOnly(v => !v)}
           style={{
             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -401,6 +417,12 @@ export default function ArtistsPage() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
             {displayed.map(artist => (
+              (() => {
+                const disciplineLabel = artist.role === 'COLLECTIVE'
+                  ? 'ART COLLECTIVE'
+                  : (artist.discipline ?? artist.art_type ?? '')
+                const locationLabel = [artist.city, artist.country].filter(Boolean).join(', ').toUpperCase()
+                return (
               <div
                 key={artist.id}
                 onClick={() => {
@@ -438,20 +460,22 @@ export default function ArtistsPage() {
                     <span style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: '#fff', marginBottom: 2 }}>
                       {(artist.username ?? artist.full_name ?? '').toUpperCase()}
                     </span>
-                    {(artist.discipline ?? artist.art_type) && (
-                      <span style={{ fontSize: 9, color: '#888880', letterSpacing: '0.08em' }}>
-                        {(artist.discipline ?? artist.art_type ?? '').toUpperCase()}
+                    {disciplineLabel && (
+                      <span style={{ fontSize: 9, color: '#c0392b', letterSpacing: '0.08em' }}>
+                        {disciplineLabel.toUpperCase()}
                       </span>
                     )}
                   </div>
 
-                  {artist.city && (
+                  {locationLabel && (
                     <span style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 9, color: '#c0392b', letterSpacing: '0.06em' }}>
-                      {artist.city.toUpperCase()}
+                      {locationLabel}
                     </span>
                   )}
                 </div>
               </div>
+                )
+              })()
             ))}
           </div>
         )}

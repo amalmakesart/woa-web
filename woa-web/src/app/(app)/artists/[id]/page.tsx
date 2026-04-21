@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { isAdminEmail } from '@/lib/admin'
 
 type ProfileTab = 'posts' | 'portfolio' | 'calendar'
 
@@ -97,6 +98,7 @@ export default function ArtistProfilePage() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [isFollowing, setIsFollowing] = useState(false)
   const [postCount, setPostCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
@@ -111,6 +113,7 @@ export default function ArtistProfilePage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id ?? null)
+      setIsAdmin(isAdminEmail(user?.email))
 
       const [
         { data: prof },
@@ -343,6 +346,15 @@ export default function ArtistProfilePage() {
               <button onClick={handleMessage} className="btn-red" style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em' }} disabled={messagingLoading}>
                 {messagingLoading ? '...' : 'MESSAGE'}
               </button>
+              {isAdmin && (
+                <button
+                  onClick={() => router.push(`/profile/edit?target=${id}`)}
+                  className="btn-primary"
+                  style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em' }}
+                >
+                  ADMIN EDIT
+                </button>
+              )}
             </div>
           ) : (
             <Link href="/profile/edit" className="btn-primary" style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em', display: 'inline-block' }}>EDIT PROFILE</Link>

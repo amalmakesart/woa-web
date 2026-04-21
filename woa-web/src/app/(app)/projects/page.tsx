@@ -2,31 +2,22 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { SignUpPrompt } from '@/components/SignUpPrompt'
 
-const GIG_TYPES = [
-  'Photographer', 'Videographer', 'Filmmaker', 'Musician', 'Singer', 'DJ', 'Producer',
-  'Model', 'Actor', 'Dancer', 'Choreographer', 'Visual Artist', 'Painter', 'Illustrator',
-  'Graphic Designer', 'Animator', 'Muralist', 'Sculptor', 'Tattoo Artist', 'Fashion Designer',
-  'Makeup Artist', 'Hair Stylist', 'Writer', 'Chef', 'Performer', 'Other',
-]
-
-interface Gig {
+interface Project {
   id: string
+  user_id: string
   title: string
-  description: string | null
-  art_type: string | null
+  description: string
+  discipline: string | null
   location: string | null
-  date_timeframe: string | null
-  budget_min: number | null
-  budget_max: number | null
-  poster_name: string | null
-  company_name: string | null
-  is_featured: boolean
-  status: 'active' | 'closed'
-  interest_count: number
+  budget: string | null
+  is_closed: boolean
+  comment_count: number
   created_at: string
+  profiles?: { username: string | null; profile_photo_url: string | null; art_type: string | null; discipline: string | null } | null
 }
 
 function parseLocationParts(location: string | null) {
@@ -103,6 +94,7 @@ function FilterModal({
             </button>
           </div>
         </div>
+
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {options.length === 0 ? (
             <div style={{ padding: '20px', textAlign: 'center', color: '#888880', fontSize: 11, letterSpacing: '0.1em' }}>
@@ -162,13 +154,6 @@ function Chip({
   )
 }
 
-function formatBudget(min: number | null, max: number | null) {
-  if (!min && !max) return 'NEGOTIABLE'
-  if (min && max) return `$${min.toLocaleString()} — $${max.toLocaleString()}`
-  if (min) return `FROM $${min.toLocaleString()}`
-  return `UP TO $${max!.toLocaleString()}`
-}
-
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime()
   const d = Math.floor(diff / 86400000)
@@ -178,101 +163,123 @@ function timeAgo(dateStr: string) {
   return Math.floor(d / 7) + 'W AGO'
 }
 
-export default function GigsPage() {
-  const [gigs, setGigs] = useState<Gig[]>([])
+export default function ProjectsPage() {
+  const router = useRouter()
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
-  const [filterType, setFilterType] = useState('')
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [canPost, setCanPost] = useState(false)
+  const [showSignUp, setShowSignUp] = useState(false)
+  const [disciplineFilter, setDisciplineFilter] = useState<string | null>(null)
   const [countryFilter, setCountryFilter] = useState<string | null>(null)
   const [cityFilter, setCityFilter] = useState<string | null>(null)
-  const [activeModal, setActiveModal] = useState<'type' | 'country' | 'city' | null>(null)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [showSignUp, setShowSignUp] = useState(false)
+  const [activeModal, setActiveModal] = useState<'discipline' | 'country' | 'city' | null>(null)
 
-  const loadGigs = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id ?? null)
 
-      let query = supabase
-        .from('gigs')
-        .select('*')
-        .eq('status', 'active')
-        .order('is_featured', { ascending: false })
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles').select('role').eq('id', user.id).single()
+        setCanPost((profile as any)?.role !== 'GIG_POSTER')
+      }
+
+      const { data } = await supabase
+        .from('projects')
+        .select('id, user_id, title, description, discipline, location, budget, is_closed, comment_count, created_at')
         .order('created_at', { ascending: false })
         .limit(50)
 
-      const { data } = await query
-      setGigs((data as Gig[]) ?? [])
+      const rows = (data as Project[]) ?? []
+
+      if (rows.length > 0) {
+        const userIds = [...new Set(rows.map(p => p.user_id))]
+        const { data: profiles } = await supabase
+          .from('profiles').select('id, username, profile_photo_url, art_type, discipline').in('id', userIds)
+        const pMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p]))
+        setProjects(rows.map(r => ({ ...r, profiles: pMap[r.user_id] ?? null })))
+      } else {
+        setProjects([])
+      }
     } catch (e) {
-      console.error('Failed to load gigs:', e)
-      setGigs([])
+      console.error('Failed to load projects:', e)
+      setProjects([])
     } finally {
       setLoading(false)
     }
-  }, [filterType])
+  }, [])
 
-  useEffect(() => { loadGigs() }, [loadGigs])
+  useEffect(() => { load() }, [load])
+
+  function handlePostClick() {
+    if (!currentUserId) { setShowSignUp(true); return }
+    if (!canPost) { window.alert('ONLY ARTISTS AND COLLECTIVES CAN POST COLLABS.'); return }
+    router.push('/projects/new')
+  }
+
+  const availableDisciplines = useMemo(() =>
+    [...new Set(projects.map((project) => project.discipline).filter(Boolean) as string[])].sort(),
+    [projects]
+  )
 
   const availableCountries = useMemo(() =>
-    [...new Set(gigs.map((gig) => parseLocationParts(gig.location).country).filter(Boolean) as string[])].sort(),
-    [gigs]
+    [...new Set(projects.map((project) => parseLocationParts(project.location).country).filter(Boolean) as string[])].sort(),
+    [projects]
   )
 
   const availableCities = useMemo(() => {
     const source = countryFilter
-      ? gigs.filter((gig) => parseLocationParts(gig.location).country === countryFilter)
-      : gigs
-    return [...new Set(source.map((gig) => parseLocationParts(gig.location).city).filter(Boolean) as string[])].sort()
-  }, [gigs, countryFilter])
+      ? projects.filter((project) => parseLocationParts(project.location).country === countryFilter)
+      : projects
+    return [...new Set(source.map((project) => parseLocationParts(project.location).city).filter(Boolean) as string[])].sort()
+  }, [projects, countryFilter])
 
-  const filteredGigs = useMemo(() => gigs.filter((gig) => {
-    const location = parseLocationParts(gig.location)
-    if (filterType && gig.art_type !== filterType) return false
+  const displayedProjects = useMemo(() => projects.filter((project) => {
+    const location = parseLocationParts(project.location)
+    if (disciplineFilter && project.discipline !== disciplineFilter) return false
     if (countryFilter && location.country !== countryFilter) return false
     if (cityFilter && location.city !== cityFilter) return false
     return true
-  }), [gigs, filterType, countryFilter, cityFilter])
+  }), [projects, disciplineFilter, countryFilter, cityFilter])
 
-  const hasFilters = !!(filterType || countryFilter || cityFilter)
+  const hasFilters = !!(disciplineFilter || countryFilter || cityFilter)
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto', padding: '20px' }}>
-      {/* Header */}
       <div
         style={{
-          position: 'sticky',
-          top: 0,
-          background: 'rgba(0,0,0,0.95)',
-          backdropFilter: 'blur(8px)',
-          zIndex: 10,
-          padding: '16px 0',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-          marginBottom: 24,
+          position: 'sticky', top: 0,
+          background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(8px)',
+          zIndex: 10, padding: '16px 0',
+          borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 24,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.02em' }}>GIG BOARD</h1>
-          {currentUserId ? (
-            <Link href="/gigs/new" className="btn-red" style={{ fontSize: 10, padding: '6px 14px' }}>
-              POST A GIG ↗
-            </Link>
-          ) : (
-            <button onClick={() => setShowSignUp(true)} className="btn-red" style={{ fontSize: 10, padding: '6px 14px', cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}>
-              POST A GIG ↗
-            </button>
-          )}
+          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.02em' }}>COLLAB</h1>
+          <button
+            onClick={handlePostClick}
+            className="btn-red"
+            style={{ fontSize: 10, padding: '6px 14px', cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}
+          >
+            POST A COLLAB ↗
+          </button>
         </div>
-        <p style={{ fontSize: 11, color: '#f5c842', letterSpacing: '0.1em', marginBottom: 16 }}>
-          HIRE ARTISTS FOR YOUR NEXT PROJECT, SHOOT, EVENT, OR CAMPAIGN.
+        <p style={{ fontSize: 11, color: '#f5c842', letterSpacing: '0.1em' }}>
+          COLLAB — ARTISTS AND COLLECTIVES POST PROJECTS, FIND HELP, AND BUILD CREATIVE TEAMS.
         </p>
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', alignItems: 'center' }}>
+      </div>
+
+      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', paddingBottom: 18, marginBottom: 8 }}>
+        <div style={{ flex: 1, display: 'flex', gap: 8, overflowX: 'auto', alignItems: 'center' }}>
           <Chip
-            label={filterType ? filterType.toUpperCase() : 'ART TYPE'}
-            active={!!filterType}
-            onPress={() => setActiveModal('type')}
-            onClear={() => setFilterType('')}
+            label={disciplineFilter ? disciplineFilter.toUpperCase() : 'DISCIPLINE'}
+            active={!!disciplineFilter}
+            onPress={() => setActiveModal('discipline')}
+            onClear={() => setDisciplineFilter(null)}
           />
           <Chip
             label={countryFilter ? countryFilter.toUpperCase() : 'COUNTRY'}
@@ -288,7 +295,7 @@ export default function GigsPage() {
           />
           {hasFilters && (
             <button
-              onClick={() => { setFilterType(''); setCountryFilter(null); setCityFilter(null) }}
+              onClick={() => { setDisciplineFilter(null); setCountryFilter(null); setCityFilter(null) }}
               style={{
                 border: '1px solid #c0392b', borderRadius: 20, padding: '7px 14px',
                 background: 'transparent', cursor: 'pointer', whiteSpace: 'nowrap',
@@ -301,108 +308,101 @@ export default function GigsPage() {
         </div>
       </div>
 
-      {/* Gig list */}
       {loading ? (
         <div style={{ textAlign: 'center', color: '#888880', fontSize: 11, letterSpacing: '0.1em', padding: '60px 0' }}>
           LOADING...
         </div>
-      ) : filteredGigs.length === 0 ? (
+      ) : displayedProjects.length === 0 ? (
         <div style={{ textAlign: 'center', color: '#888880', fontSize: 11, letterSpacing: '0.1em', padding: '60px 0' }}>
-          {gigs.length === 0 ? 'NO OPEN GIGS' : 'NO MATCHING GIGS'}
+          {projects.length === 0 ? 'NO COLLABS YET — BE THE FIRST TO POST' : 'NO MATCHING COLLABS'}
         </div>
       ) : (
-        filteredGigs.map(gig => (
+        displayedProjects.map(project => (
           <Link
-            key={gig.id}
-            href={`/gigs/${gig.id}`}
+            key={project.id}
+            href={`/projects/${project.id}`}
             style={{ textDecoration: 'none', display: 'block' }}
           >
             <div
               style={{
-                display: 'flex',
-                alignItems: 'baseline',
-                justifyContent: 'space-between',
                 padding: '24px 0',
                 borderBottom: '1px solid rgba(255,255,255,0.08)',
-                gap: 16,
                 cursor: 'pointer',
                 transition: 'padding-left 0.2s',
               }}
-              className="gig-row-hover"
+              className="project-row-hover"
             >
-              <div style={{ flex: 1 }}>
-                {gig.is_featured && (
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      fontSize: 9,
-                      color: '#c0392b',
-                      letterSpacing: '0.14em',
-                      border: '1px solid #c0392b',
-                      padding: '2px 6px',
-                      marginBottom: 8,
-                    }}
-                  >
-                    FEATURED
-                  </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                {project.profiles?.profile_photo_url ? (
+                  <img src={project.profiles.profile_photo_url} alt="" className="oct-avatar" style={{ width: 28, height: 28, flexShrink: 0 }} />
+                ) : (
+                  <div className="oct-avatar" style={{ width: 28, height: 28, background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888880', fontSize: 10, flexShrink: 0 }}>◯</div>
                 )}
-                <span
-                  style={{
-                    display: 'block',
-                    fontSize: 16,
-                    fontWeight: 700,
-                    letterSpacing: '0.02em',
-                    lineHeight: 1.2,
-                    marginBottom: 8,
-                    color: '#fff',
-                  }}
-                >
-                  {gig.title}
-                </span>
                 <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.08em' }}>
-                  {[
-                    gig.company_name ?? gig.poster_name,
-                    gig.art_type,
-                    gig.location,
-                    gig.date_timeframe,
-                  ].filter(Boolean).join(' · ').toUpperCase()}
+                  {(project.profiles?.username ?? 'UNKNOWN').toUpperCase()}
+                  {(project.profiles?.discipline ?? project.profiles?.art_type)
+                    ? ` · ${(project.profiles?.discipline ?? project.profiles?.art_type)?.toUpperCase()}`
+                    : ''}
+                  {' · ' + timeAgo(project.created_at)}
                 </span>
               </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <span
-                  style={{
-                    display: 'block',
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: '#fff',
-                    marginBottom: 4,
-                  }}
-                >
-                  {formatBudget(gig.budget_min, gig.budget_max)}
-                </span>
-                <span style={{ fontSize: 10, color: '#c0392b', letterSpacing: '0.08em' }}>
-                  {gig.interest_count} INTERESTED
-                </span>
-              </div>
+
+              <span style={{ display: 'block', fontSize: 16, fontWeight: 700, letterSpacing: '0.02em', lineHeight: 1.2, marginBottom: 8, color: '#fff' }}>
+                {project.title}
+              </span>
+
+              <p style={{ fontSize: 12, color: '#888880', lineHeight: 1.6, marginBottom: 10, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
+                {project.description}
+              </p>
+
+              {(project.discipline || project.location) && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                  {project.discipline ? (
+                    <span style={{ fontSize: 9, color: '#c0392b', letterSpacing: '0.1em' }}>
+                      {project.discipline.toUpperCase()}
+                    </span>
+                  ) : null}
+                  {project.location ? (
+                    <span style={{ fontSize: 9, color: '#c0392b', letterSpacing: '0.1em' }}>
+                      {project.location.toUpperCase()}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+
+              {project.budget && (
+                <div style={{ fontSize: 10, color: '#f5c842', letterSpacing: '0.08em', marginBottom: 10 }}>
+                  BUDGET: {project.budget.toUpperCase()}
+                </div>
+              )}
+
+              {project.is_closed && (
+                <div style={{ marginBottom: 10 }}>
+                  <span style={{ fontSize: 9, color: '#888880', letterSpacing: '0.12em', border: '1px solid rgba(255,255,255,0.16)', padding: '3px 8px' }}>
+                    CLOSED
+                  </span>
+                </div>
+              )}
+
+              <span style={{ fontSize: 10, color: '#555', letterSpacing: '0.08em' }}>
+                {project.comment_count} {project.comment_count === 1 ? 'COMMENT' : 'COMMENTS'}
+              </span>
             </div>
           </Link>
         ))
       )}
 
       {showSignUp && (
-        <SignUpPrompt
-          message="JOIN WOA TO POST A GIG"
-          onClose={() => setShowSignUp(false)}
-        />
+        <SignUpPrompt message="JOIN WOA TO POST A COLLAB" onClose={() => setShowSignUp(false)} />
       )}
 
       <FilterModal
-        visible={activeModal === 'type'}
-        title="SELECT ART TYPE"
-        options={GIG_TYPES}
-        selected={filterType || null}
-        onSelect={(value) => setFilterType(value)}
-        onClear={() => setFilterType('')}
+        visible={activeModal === 'discipline'}
+        title="SELECT DISCIPLINE"
+        options={availableDisciplines}
+        selected={disciplineFilter}
+        onSelect={setDisciplineFilter}
+        onClear={() => setDisciplineFilter(null)}
         onClose={() => setActiveModal(null)}
       />
       <FilterModal
@@ -424,9 +424,7 @@ export default function GigsPage() {
         onClose={() => setActiveModal(null)}
       />
 
-      <style>{`
-        .gig-row-hover:hover { padding-left: 12px !important; }
-      `}</style>
+      <style>{`.project-row-hover:hover { padding-left: 12px !important; }`}</style>
     </div>
   )
 }

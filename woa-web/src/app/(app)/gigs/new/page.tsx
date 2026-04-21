@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { isAdminEmail } from '@/lib/admin'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -55,8 +56,11 @@ function formatTime(val: string) {
 
 export default function PostGigPage() {
   const router = useRouter()
+  const [editGigId, setEditGigId] = useState<string | null>(null)
+  const isEditMode = !!editGigId
   const [step, setStep] = useState<Step>('details')
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [posterName, setPosterName] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -85,19 +89,55 @@ export default function PostGigPage() {
   const [isFeatured, setIsFeatured] = useState(false)
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    setEditGigId(new URLSearchParams(window.location.search).get('edit'))
+  }, [])
+
+  useEffect(() => {
     async function load() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setCurrentUserId(user.id)
+      setIsAdmin(isAdminEmail(user.email))
       const { data: me } = await supabase.from('profiles').select('full_name, username, company_name').eq('id', user.id).single()
       if (me) {
         const d = me as any
         setPosterName(d.company_name ?? d.full_name ?? d.username ?? null)
       }
+
+      if (editGigId) {
+        const gigQuery = supabase.from('gigs').select('*').eq('id', editGigId)
+        const { data: gig } = isAdminEmail(user.email)
+          ? await gigQuery.single()
+          : await gigQuery.eq('poster_id', user.id).single()
+
+        if (gig) {
+          const g = gig as any
+          setTitle(g.title ?? '')
+          setCompanyName(g.company_name ?? '')
+          setDescription(g.description ?? '')
+          setArtType(g.art_type ?? '')
+          setGigImageUrl(g.image_url ?? null)
+          setGigImagePreview(g.image_url ?? null)
+          if ((g.location ?? '') === 'Remote') {
+            setSelectedCountry('Remote')
+            setSelectedCity('')
+          } else if (g.location?.includes(',')) {
+            const [cityPart, ...countryParts] = String(g.location).split(',')
+            setSelectedCity(cityPart.trim())
+            setSelectedCountry(countryParts.join(',').trim())
+          } else {
+            setSelectedCountry(g.location ?? '')
+          }
+          setBudgetMin(g.budget_min != null ? String(g.budget_min) : '')
+          setBudgetMax(g.budget_max != null ? String(g.budget_max) : '')
+          setIsFeatured(!!g.is_featured)
+        }
+      }
     }
     load()
-  }, [router])
+  }, [router, editGigId])
 
   // Listen for payment success from iframe
   useEffect(() => {
@@ -156,7 +196,7 @@ export default function PostGigPage() {
     if (step === 'details') {
       if (!validate()) return
       setStep('review')
-    } else if (step === 'review') {
+    } else if (step === 'review' && !isEditMode) {
       setStep('payment')
     }
   }
@@ -226,7 +266,45 @@ export default function PostGigPage() {
     setSubmitting(false)
   }
 
-  const STEPS: Step[] = ['details', 'review', 'payment']
+  async function handleSaveGigEdits() {
+    if (!currentUserId || !editGigId) return
+    setSubmitting(true)
+    setError('')
+
+    const imageUrl = await uploadImageIfNeeded()
+    const minVal = budgetMin ? parseFloat(budgetMin.replace(/[^0-9.]/g, '')) : null
+    const maxVal = budgetMax ? parseFloat(budgetMax.replace(/[^0-9.]/g, '')) : null
+
+    const draft = {
+      title: title.trim(),
+      company_name: companyName.trim() || posterName || null,
+      description: description.trim() || null,
+      art_type: artType || null,
+      image_url: imageUrl || null,
+      location: locationString,
+      date_timeframe: dateTimeframe || null,
+      budget_min: minVal,
+      budget_max: maxVal,
+      is_featured: isFeatured,
+    }
+
+    const supabase = createClient()
+    const query = supabase.from('gigs').update(draft).eq('id', editGigId)
+    const { error: updateError } = isAdmin
+      ? await query
+      : await query.eq('poster_id', currentUserId)
+
+    if (updateError) {
+      setError(updateError.message)
+      setSubmitting(false)
+      return
+    }
+
+    setSubmitting(false)
+    router.push(`/gigs/${editGigId}`)
+  }
+
+  const STEPS: Step[] = isEditMode ? ['details', 'review'] : ['details', 'review', 'payment']
   const stepIndex = STEPS.indexOf(step)
 
   // ── RENDER ─────────────────────────────────────────────────────────────
@@ -236,7 +314,7 @@ export default function PostGigPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
         <button onClick={handleBack} style={{ background: 'none', border: 'none', color: '#888880', fontSize: 20, cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1 }}>‹</button>
-        <h1 style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.18em' }}>POST A GIG</h1>
+        <h1 style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.18em' }}>{isEditMode ? 'EDIT GIG' : 'POST A GIG'}</h1>
       </div>
 
       {/* Progress bar */}
@@ -487,9 +565,15 @@ export default function PostGigPage() {
             <span style={{ fontSize: 24, fontWeight: 700, color: '#c0392b' }}>${totalCost.toFixed(2)}</span>
           </div>
 
-          <button onClick={handleNext} className="btn-red" style={{ padding: '14px', fontSize: 11, letterSpacing: '0.14em' }}>
-            PAYMENT ›
-          </button>
+          {isEditMode ? (
+            <button onClick={handleSaveGigEdits} className="btn-red" style={{ padding: '14px', fontSize: 11, letterSpacing: '0.14em' }} disabled={submitting || uploadingImage}>
+              {submitting || uploadingImage ? 'SAVING...' : 'SAVE CHANGES'}
+            </button>
+          ) : (
+            <button onClick={handleNext} className="btn-red" style={{ padding: '14px', fontSize: 11, letterSpacing: '0.14em' }}>
+              PAYMENT ›
+            </button>
+          )}
         </div>
       )}
 

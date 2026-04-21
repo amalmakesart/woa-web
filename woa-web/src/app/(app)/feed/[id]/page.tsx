@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { PostActionsMenu } from '@/components/PostActionsMenu'
+import { isAdminEmail } from '@/lib/admin'
 
 interface Post {
   id: string
@@ -51,6 +52,7 @@ export default function PostDetailPage() {
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [commentText, setCommentText] = useState('')
@@ -62,6 +64,7 @@ export default function PostDetailPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id ?? null)
+      setIsAdmin(isAdminEmail(user?.email))
 
       const [{ data: postData }, { data: commentsData }] = await Promise.all([
         supabase.from('posts').select('*').eq('id', postId).single(),
@@ -150,7 +153,7 @@ export default function PostDetailPage() {
   }
 
   async function handleDelete() {
-    if (!currentUserId || !post || currentUserId !== post.user_id) return
+    if (!currentUserId || !post || (currentUserId !== post.user_id && !isAdmin)) return
     if (!window.confirm('DELETE THIS POST? THIS CANNOT BE UNDONE.')) return
     const supabase = createClient()
     await supabase.from('posts').delete().eq('id', post.id)
@@ -158,7 +161,7 @@ export default function PostDetailPage() {
   }
 
   function handleEdit() {
-    if (!currentUserId || !post || currentUserId !== post.user_id) return
+    if (!currentUserId || !post || (currentUserId !== post.user_id && !isAdmin)) return
     router.push(`/feed/new?edit=${post.id}`)
   }
 
@@ -240,7 +243,7 @@ export default function PostDetailPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.06em' }}>{timeAgo(post.created_at)}</span>
           <PostActionsMenu
-            isOwner={currentUserId === post.user_id}
+            canManage={currentUserId === post.user_id || isAdmin}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onReport={handleReport}

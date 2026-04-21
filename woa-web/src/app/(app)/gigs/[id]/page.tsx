@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { isAdminEmail } from '@/lib/admin'
 
 interface Gig {
   id: string
@@ -38,6 +39,7 @@ export default function GigDetailPage() {
   const [gig, setGig] = useState<Gig | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [hasInterest, setHasInterest] = useState(false)
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -48,6 +50,7 @@ export default function GigDetailPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id ?? null)
+      setIsAdmin(isAdminEmail(user?.email))
 
       const [{ data: gigData }, { data: interest }] = await Promise.all([
         supabase.from('gigs').select('*').eq('id', id).single(),
@@ -97,6 +100,17 @@ export default function GigDetailPage() {
   }
 
   const isOwner = currentUserId === gig.poster_id
+  const canManage = isOwner || isAdmin
+
+  async function handleDeleteGig() {
+    if (!canManage) return
+    const gigId = gig?.id
+    if (!gigId) return
+    if (!window.confirm('DELETE THIS GIG? THIS CANNOT BE UNDONE.')) return
+    const supabase = createClient()
+    await supabase.from('gigs').delete().eq('id', gigId)
+    router.push('/gigs')
+  }
 
   return (
     <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px' }}>
@@ -239,14 +253,28 @@ export default function GigDetailPage() {
         </div>
       )}
 
-      {isOwner && (
-        <div style={{ display: 'flex', gap: 10 }}>
+      {canManage && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => router.push(`/gigs/new?edit=${gig.id}`)}
+            className="btn-primary"
+            style={{ flex: 1 }}
+          >
+            EDIT GIG
+          </button>
           <button
             onClick={() => router.push(`/gigs/${id}/interested`)}
             className="btn-primary"
             style={{ flex: 1 }}
           >
             VIEW INTERESTED ARTISTS ({gig.interest_count})
+          </button>
+          <button
+            onClick={handleDeleteGig}
+            className="btn-red"
+            style={{ flex: 1 }}
+          >
+            DELETE GIG
           </button>
         </div>
       )}

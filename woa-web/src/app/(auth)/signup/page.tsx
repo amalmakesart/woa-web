@@ -32,11 +32,55 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState('')
   const [username, setUsername] = useState('')
   const [discipline, setDiscipline] = useState('')
+  const [collectiveType, setCollectiveType] = useState('')
+  const [country, setCountry] = useState('')
+  const [city, setCity] = useState('')
+  const [bio, setBio] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const canContinue = (() => {
+    if (step === 1) return true
+    if (step === 2) return email.trim().length > 0 && password.length >= 6
+    if (!fullName.trim() || !username.trim()) return false
+    if (role === 'ARTIST') return discipline.trim().length > 0
+    if (role === 'COLLECTIVE') return collectiveType.trim().length > 0 && city.trim().length > 0 && country.trim().length > 0
+    return true
+  })()
+
+  function buildProfileData() {
+    if (role === 'ARTIST') {
+      return {
+        full_name: fullName,
+        username,
+        role,
+        discipline,
+        art_type: discipline,
+      }
+    }
+
+    if (role === 'COLLECTIVE') {
+      return {
+        full_name: fullName,
+        username,
+        role,
+        collective_type: collectiveType,
+        country,
+        city,
+        bio,
+      }
+    }
+
+    return {
+      full_name: fullName,
+      username,
+      role,
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!canContinue) return
     if (step < 3) { setStep((step + 1) as Step); return }
 
     setError('')
@@ -46,7 +90,7 @@ export default function SignupPage() {
     const { data, error: signUpErr } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, username, role, art_type: discipline } },
+      options: { data: buildProfileData() },
     })
 
     if (signUpErr) { setError(signUpErr.message); setLoading(false); return }
@@ -54,10 +98,8 @@ export default function SignupPage() {
     if (data.user) {
       await supabase.from('profiles').upsert({
         id: data.user.id,
-        full_name: fullName,
+        ...buildProfileData(),
         username: username.toLowerCase(),
-        role,
-        art_type: discipline || null,
         follower_count: 0,
         rating_count: 0,
       })
@@ -193,7 +235,7 @@ export default function SignupPage() {
                 STEP 3 — YOUR PROFILE
               </p>
               <div>
-                <label className="woa-input-label">FULL NAME</label>
+                <label className="woa-input-label">{role === 'COLLECTIVE' ? 'COLLECTIVE NAME' : 'FULL NAME'}</label>
                 <input
                   className="woa-input"
                   type="text"
@@ -224,6 +266,7 @@ export default function SignupPage() {
                     value={discipline}
                     onChange={e => setDiscipline(e.target.value)}
                     style={{ cursor: 'pointer' }}
+                    required
                   >
                     <option value="">SELECT YOUR DISCIPLINE</option>
                     {DISCIPLINES.map(d => (
@@ -231,6 +274,55 @@ export default function SignupPage() {
                     ))}
                   </select>
                 </div>
+              )}
+              {role === 'COLLECTIVE' && (
+                <>
+                  <div>
+                    <label className="woa-input-label">COLLECTIVE TYPE</label>
+                    <input
+                      className="woa-input"
+                      type="text"
+                      value={collectiveType}
+                      onChange={e => setCollectiveType(e.target.value)}
+                      placeholder="GALLERY, LABEL, COMPANY, STUDIO..."
+                      required
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+                    <div>
+                      <label className="woa-input-label">CITY</label>
+                      <input
+                        className="woa-input"
+                        type="text"
+                        value={city}
+                        onChange={e => setCity(e.target.value)}
+                        placeholder="CITY"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="woa-input-label">COUNTRY</label>
+                      <input
+                        className="woa-input"
+                        type="text"
+                        value={country}
+                        onChange={e => setCountry(e.target.value)}
+                        placeholder="COUNTRY"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="woa-input-label">ABOUT YOUR COLLECTIVE</label>
+                    <textarea
+                      className="woa-input"
+                      value={bio}
+                      onChange={e => setBio(e.target.value)}
+                      placeholder="TELL PEOPLE WHAT YOUR COLLECTIVE DOES."
+                      style={{ minHeight: 120, resize: 'vertical' }}
+                    />
+                  </div>
+                </>
               )}
             </>
           )}
@@ -254,7 +346,7 @@ export default function SignupPage() {
               type="submit"
               className="btn-primary"
               style={{ flex: 2 }}
-              disabled={loading}
+              disabled={loading || !canContinue}
             >
               {step < 3 ? 'NEXT' : loading ? 'CREATING...' : 'CREATE ACCOUNT'}
             </button>

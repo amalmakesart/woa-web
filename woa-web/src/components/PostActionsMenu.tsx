@@ -3,17 +3,23 @@
 import { useEffect, useRef, useState } from 'react'
 
 interface PostActionsMenuProps {
-  isOwner: boolean
+  canManage: boolean
+  canPin?: boolean
+  isPinned?: boolean
   onEdit?: () => void
   onDelete?: () => void
   onReport?: () => void
+  onPin?: () => void
 }
 
 export function PostActionsMenu({
-  isOwner,
+  canManage,
+  canPin,
+  isPinned,
   onEdit,
   onDelete,
   onReport,
+  onPin,
 }: PostActionsMenuProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -93,8 +99,22 @@ export function PostActionsMenu({
             zIndex: 20,
           }}
         >
-          {isOwner ? (
+          {canManage ? (
             <>
+              {canPin && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    setOpen(false)
+                    onPin?.()
+                  }}
+                  style={{ ...itemStyle, color: '#f5c842' }}
+                >
+                  {isPinned ? 'UNPIN POST' : 'PIN POST'}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={(event) => {

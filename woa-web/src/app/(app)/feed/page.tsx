@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { SignUpPrompt } from '@/components/SignUpPrompt'
 import { PostActionsMenu } from '@/components/PostActionsMenu'
+import { isAdminEmail } from '@/lib/admin'
 
 type FeedTab = 'foryou' | 'following' | 'arttype' | 'location'
 
@@ -27,6 +28,7 @@ interface Post {
   tags: string[]
   like_count: number
   comment_count: number
+  is_pinned: boolean
   created_at: string
   profiles?: {
     username: string
@@ -63,6 +65,8 @@ function PostCard({
   onEdit,
   onDelete,
   onReport,
+  onPin,
+  isAdmin,
   onSignUp,
 }: {
   post: Post
@@ -74,12 +78,14 @@ function PostCard({
   onEdit: (post: Post) => void
   onDelete: (post: Post) => void
   onReport: (post: Post) => void
+  onPin: (post: Post) => void
+  isAdmin: boolean
   onSignUp: () => void
 }) {
   const isLiked = likedIds.has(post.id)
   const isBookmarked = bookmarkedIds.has(post.id)
   const profile = post.profiles
-  const isOwner = currentUserId === post.user_id
+  const canManage = currentUserId === post.user_id || isAdmin
   const collaboratorNames = (post.collaborators ?? [])
     .map(c => c.username ?? c.full_name)
     .filter(Boolean)
@@ -90,8 +96,16 @@ function PostCard({
       style={{
         borderBottom: '1px solid rgba(255,255,255,0.08)',
         padding: '20px 0',
+        borderLeft: post.is_pinned ? '2px solid #f5c842' : 'none',
+        paddingLeft: post.is_pinned ? 14 : 0,
       }}
     >
+      {/* Pinned badge */}
+      {post.is_pinned && (
+        <div style={{ fontSize: 9, color: '#f5c842', letterSpacing: '0.18em', marginBottom: 8 }}>
+          ▲ PINNED
+        </div>
+      )}
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <Link href={`/artists/${post.user_id}`}>
@@ -153,10 +167,13 @@ function PostCard({
             {timeAgo(post.created_at)}
           </span>
           <PostActionsMenu
-            isOwner={isOwner}
+            canManage={canManage}
+            canPin={isAdmin}
+            isPinned={post.is_pinned}
             onEdit={() => onEdit(post)}
             onDelete={() => onDelete(post)}
             onReport={() => onReport(post)}
+            onPin={() => onPin(post)}
           />
         </div>
       </div>
@@ -307,6 +324,7 @@ export default function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set())
   const [showSignUp, setShowSignUp] = useState(false)
@@ -317,10 +335,12 @@ export default function FeedPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id ?? null)
+      setIsAdmin(isAdminEmail(user?.email))
 
       let postsQuery = supabase
         .from('posts')
         .select('*')
+        .order('is_pinned', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(30)
 
@@ -431,17 +451,26 @@ export default function FeedPage() {
   }
 
   function handleEdit(post: Post) {
-    if (currentUserId !== post.user_id) return
+    if (currentUserId !== post.user_id && !isAdmin) return
     router.push(`/feed/new?edit=${post.id}`)
   }
 
   async function handleDelete(post: Post) {
-    if (currentUserId !== post.user_id) return
+    if (currentUserId !== post.user_id && !isAdmin) return
     if (!window.confirm('DELETE THIS POST? THIS CANNOT BE UNDONE.')) return
 
     const supabase = createClient()
     setPosts((prev) => prev.filter((item) => item.id !== post.id))
     await supabase.from('posts').delete().eq('id', post.id)
+  }
+
+  async function handlePin(post: Post) {
+    if (!isAdmin) return
+    const supabase = createClient()
+    const newPinned = !post.is_pinned
+    setPosts(prev => prev.map(p => p.id === post.id ? { ...p, is_pinned: newPinned } : p))
+    await supabase.from('posts').update({ is_pinned: newPinned }).eq('id', post.id)
+    if (newPinned) setPosts(prev => [...prev.filter(p => p.id === post.id), ...prev.filter(p => p.id !== post.id)])
   }
 
   function handleReport(post: Post) {
@@ -529,6 +558,8 @@ export default function FeedPage() {
             onEdit={handleEdit}
             onDelete={handleDelete}
             onReport={handleReport}
+            onPin={handlePin}
+            isAdmin={isAdmin}
             onSignUp={() => setShowSignUp(true)}
           />
         ))
