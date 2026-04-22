@@ -112,7 +112,7 @@ export default function PostDetailPage() {
 
       if (user) {
         const [{ data: like }, { data: bookmark }] = await Promise.all([
-          supabase.from('post_likes').select('post_id').eq('post_id', postId).eq('user_id', user.id).maybeSingle(),
+          supabase.from('likes').select('post_id').eq('post_id', postId).eq('user_id', user.id).maybeSingle(),
           supabase.from('bookmarks').select('post_id').eq('post_id', postId).eq('user_id', user.id).maybeSingle(),
         ])
         setIsLiked(!!like)
@@ -127,16 +127,36 @@ export default function PostDetailPage() {
   async function handleLike() {
     if (!currentUserId || !post) return
     const supabase = createClient()
+    const previousPost = post
+    const previousLiked = isLiked
     if (isLiked) {
       setIsLiked(false)
       setPost(p => p ? { ...p, like_count: p.like_count - 1 } : p)
-      await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', currentUserId)
-      await supabase.rpc('decrement_like_count', { post_id: postId })
+      const { error } = await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', currentUserId)
+      if (error) {
+        setIsLiked(previousLiked)
+        setPost(previousPost)
+        window.alert(`LIKE FAILED — ${error.message.toUpperCase()}`)
+      }
     } else {
       setIsLiked(true)
       setPost(p => p ? { ...p, like_count: p.like_count + 1 } : p)
-      await supabase.from('post_likes').insert({ post_id: postId, user_id: currentUserId })
-      await supabase.rpc('increment_like_count', { post_id: postId })
+      const { error } = await supabase.from('likes').insert({ post_id: postId, user_id: currentUserId })
+      if (error) {
+        setIsLiked(previousLiked)
+        setPost(previousPost)
+        window.alert(`LIKE FAILED — ${error.message.toUpperCase()}`)
+      } else if (post.user_id !== currentUserId) {
+        await supabase.from('notifications').insert({
+          user_id: post.user_id,
+          type: 'post_liked',
+          actor_id: currentUserId,
+          reference_id: post.id,
+          reference_type: 'post',
+          preview_text: post.title ?? post.content?.slice(0, 40) ?? null,
+          is_read: false,
+        })
+      }
     }
   }
 

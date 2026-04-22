@@ -396,7 +396,7 @@ export default function FeedPage() {
       if (user && posts.length > 0) {
         const postIds = posts.map(p => p.id)
         const [{ data: likes }, { data: bookmarks }] = await Promise.all([
-          supabase.from('post_likes').select('post_id').eq('user_id', user.id).in('post_id', postIds),
+          supabase.from('likes').select('post_id').eq('user_id', user.id).in('post_id', postIds),
           supabase.from('bookmarks').select('post_id').eq('user_id', user.id).in('post_id', postIds),
         ])
         setLikedIds(new Set((likes ?? []).map((l: any) => l.post_id)))
@@ -432,6 +432,7 @@ export default function FeedPage() {
     if (!currentUserId) return
     const supabase = createClient()
     const isLiked = likedIds.has(postId)
+    const postBeforeUpdate = posts.find((post) => post.id === postId)
     setLikedIds(prev => {
       const next = new Set(prev)
       isLiked ? next.delete(postId) : next.add(postId)
@@ -440,13 +441,31 @@ export default function FeedPage() {
     setPosts(prev => prev.map(p =>
       p.id === postId ? { ...p, like_count: p.like_count + (isLiked ? -1 : 1) } : p
     ))
-    if (isLiked) {
-      await supabase.from('post_likes').delete()
-        .eq('post_id', postId).eq('user_id', currentUserId)
-      await supabase.rpc('decrement_like_count', { post_id: postId })
-    } else {
-      await supabase.from('post_likes').insert({ post_id: postId, user_id: currentUserId })
-      await supabase.rpc('increment_like_count', { post_id: postId })
+
+    const { error } = isLiked
+      ? await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', currentUserId)
+      : await supabase.from('likes').insert({ post_id: postId, user_id: currentUserId })
+
+    if (error) {
+      setLikedIds(prev => {
+        const next = new Set(prev)
+        isLiked ? next.add(postId) : next.delete(postId)
+        return next
+      })
+      if (postBeforeUpdate) {
+        setPosts(prev => prev.map(p => p.id === postId ? postBeforeUpdate : p))
+      }
+      window.alert(`LIKE FAILED — ${error.message.toUpperCase()}`)
+    } else if (!isLiked && postBeforeUpdate && postBeforeUpdate.user_id !== currentUserId) {
+      await supabase.from('notifications').insert({
+        user_id: postBeforeUpdate.user_id,
+        type: 'post_liked',
+        actor_id: currentUserId,
+        reference_id: postBeforeUpdate.id,
+        reference_type: 'post',
+        preview_text: postBeforeUpdate.title ?? postBeforeUpdate.content?.slice(0, 40) ?? null,
+        is_read: false,
+      })
     }
   }
 
