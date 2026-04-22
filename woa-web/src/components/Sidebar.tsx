@@ -1,8 +1,11 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { WOALogo } from './WOALogo'
+import { isAdminEmail } from '@/lib/admin'
+import { createClient } from '@/lib/supabase/client'
 
 const NAV = [
   { href: '/feed', label: 'FEED' },
@@ -18,6 +21,18 @@ const NAV = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      if (alive) setIsAdmin(isAdminEmail(data.user?.email))
+    })
+    return () => { alive = false }
+  }, [])
+
+  const nav = isAdmin ? [...NAV, { href: '/admin', label: 'ADMIN' }] : NAV
 
   return (
     <aside
@@ -40,7 +55,7 @@ export function Sidebar() {
       </div>
 
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {NAV.map(({ href, label }) => {
+        {nav.map(({ href, label }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
           return (
             <Link
