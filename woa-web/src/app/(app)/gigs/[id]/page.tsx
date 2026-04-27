@@ -43,8 +43,10 @@ export default function GigDetailPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [hasInterest, setHasInterest] = useState(false)
   const [message, setMessage] = useState('')
+  const [suggestedFee, setSuggestedFee] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [interestError, setInterestError] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -60,7 +62,7 @@ export default function GigDetailPage() {
       const [{ data: gigData }, { data: interest }] = await Promise.all([
         supabase.from('gigs').select('*').eq('id', id).single(),
         user
-          ? supabase.from('gig_interests').select('id').eq('gig_id', id).eq('user_id', user.id).maybeSingle()
+          ? supabase.from('gig_interests').select('id').eq('gig_id', id).eq('artist_id', user.id).maybeSingle()
           : Promise.resolve({ data: null }),
       ])
 
@@ -74,13 +76,27 @@ export default function GigDetailPage() {
   async function handleExpressInterest(e: React.FormEvent) {
     e.preventDefault()
     if (!currentUserId) { router.push('/login'); return }
+    if (!suggestedFee.trim()) { setInterestError('PLEASE ENTER YOUR SUGGESTED FEE.'); return }
+    const feeNum = parseFloat(suggestedFee.replace(/[^0-9.]/g, ''))
+    if (isNaN(feeNum) || feeNum <= 0) { setInterestError('PLEASE ENTER A VALID DOLLAR AMOUNT.'); return }
+    setInterestError('')
     setSubmitting(true)
     const supabase = createClient()
-    await supabase.from('gig_interests').insert({
+    const { error } = await supabase.from('gig_interests').insert({
       gig_id: id,
-      user_id: currentUserId,
-      message: message.trim() || null,
+      artist_id: currentUserId,
+      suggested_fee: feeNum,
+      note: message.trim() || null,
     })
+    if (error) {
+      if (error.code === '23505') {
+        setHasInterest(true)
+      } else {
+        setInterestError(error.message.toUpperCase())
+      }
+      setSubmitting(false)
+      return
+    }
     await supabase.rpc('increment_interest_count', { gig_id: id })
     setHasInterest(true)
     setSubmitted(true)
@@ -232,14 +248,30 @@ export default function GigDetailPage() {
               <p style={{ fontSize: 11, letterSpacing: '0.1em', color: '#888880', marginBottom: 4 }}>
                 EXPRESS YOUR INTEREST
               </p>
-              <textarea
-                className="woa-input"
-                placeholder="TELL THEM WHY YOU'RE THE RIGHT FIT (OPTIONAL)"
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-                rows={4}
-                style={{ resize: 'vertical' }}
-              />
+              <div>
+                <label className="woa-input-label">YOUR SUGGESTED FEE ($) *</label>
+                <input
+                  className="woa-input"
+                  type="number"
+                  placeholder="E.G. 250"
+                  value={suggestedFee}
+                  onChange={e => setSuggestedFee(e.target.value)}
+                  min="1"
+                  required
+                />
+              </div>
+              <div>
+                <label className="woa-input-label">NOTE (OPTIONAL)</label>
+                <textarea
+                  className="woa-input"
+                  placeholder="TELL THEM WHY YOU'RE THE RIGHT FIT"
+                  value={message}
+                  onChange={e => setMessage(e.target.value)}
+                  rows={3}
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+              {interestError && <p style={{ fontSize: 10, color: '#c0392b', letterSpacing: '0.08em' }}>{interestError}</p>}
               {!currentUserId && (
                 <p style={{ fontSize: 10, color: '#888880', letterSpacing: '0.08em' }}>
                   YOU MUST BE SIGNED IN TO EXPRESS INTEREST

@@ -38,20 +38,22 @@ function ImageCarousel({ urls }: { urls: string[] }) {
       <img src={urls[idx]} alt="" style={{ width: '100%', maxHeight: 560, objectFit: 'cover', display: 'block' }} />
 
       {/* Prev */}
-      <button
-        onClick={() => setIdx(i => Math.max(0, i - 1))}
-        disabled={idx === 0}
-        style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 44, background: 'none', border: 'none', color: '#fff', fontSize: 28, cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0 : 1, transition: 'opacity 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
-        aria-label="Previous image"
-      >‹</button>
+      {idx > 0 && (
+        <button
+          onClick={() => setIdx(i => i - 1)}
+          style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', borderRadius: 0 }}
+          aria-label="Previous image"
+        >‹</button>
+      )}
 
       {/* Next */}
-      <button
-        onClick={() => setIdx(i => Math.min(urls.length - 1, i + 1))}
-        disabled={idx === urls.length - 1}
-        style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 44, background: 'none', border: 'none', color: '#fff', fontSize: 28, cursor: idx === urls.length - 1 ? 'default' : 'pointer', opacity: idx === urls.length - 1 ? 0 : 1, transition: 'opacity 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
-        aria-label="Next image"
-      >›</button>
+      {idx < urls.length - 1 && (
+        <button
+          onClick={() => setIdx(i => i + 1)}
+          style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', borderRadius: 0 }}
+          aria-label="Next image"
+        >›</button>
+      )}
 
       {/* Counter */}
       <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 10, padding: '3px 8px', letterSpacing: '0.1em', fontFamily: 'inherit', pointerEvents: 'none' }}>

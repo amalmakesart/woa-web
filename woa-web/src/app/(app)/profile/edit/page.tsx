@@ -104,7 +104,7 @@ export default function EditProfilePage() {
       setLoading(false)
     }
     load()
-  }, [router, targetId])
+  }, [targetId])
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -223,10 +223,12 @@ export default function EditProfilePage() {
               <label className="woa-input-label">FULL NAME</label>
               <input className="woa-input" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your name" />
             </div>
-            <div>
-              <label className="woa-input-label">USERNAME</label>
-              <input className="woa-input" value={username} onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="username" />
-            </div>
+            {!isGigPoster && !isArtLover && (
+              <div>
+                <label className="woa-input-label">USERNAME</label>
+                <input className="woa-input" value={username} onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="username" />
+              </div>
+            )}
             {isGigPoster && (
               <div>
                 <label className="woa-input-label">COMPANY / VENUE NAME</label>
@@ -250,19 +252,21 @@ export default function EditProfilePage() {
                 </div>
               </>
             )}
-            <div>
-              <label className="woa-input-label">BIO</label>
-              <textarea
-                className="woa-input"
-                value={bio}
-                onChange={e => setBio(e.target.value)}
-                placeholder="A few words about your work..."
-                rows={4}
-                maxLength={500}
-                style={{ resize: 'vertical' }}
-              />
-              <p style={{ fontSize: 10, color: '#444', marginTop: 4, letterSpacing: '0.04em' }}>{bio.length}/500</p>
-            </div>
+            {!isGigPoster && !isArtLover && (
+              <div>
+                <label className="woa-input-label">BIO</label>
+                <textarea
+                  className="woa-input"
+                  value={bio}
+                  onChange={e => setBio(e.target.value)}
+                  placeholder="A few words about your work..."
+                  rows={4}
+                  maxLength={500}
+                  style={{ resize: 'vertical' }}
+                />
+                <p style={{ fontSize: 10, color: '#444', marginTop: 4, letterSpacing: '0.04em' }}>{bio.length}/500</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -340,48 +344,52 @@ export default function EditProfilePage() {
           </div>
         )}
 
-        {/* Location */}
-        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 20 }}>
-          <p style={{ fontSize: 9, letterSpacing: '0.2em', color: '#555', marginBottom: 14 }}>LOCATION</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label className="woa-input-label">CITY</label>
-              <input className="woa-input" value={city} onChange={e => setCity(e.target.value)} placeholder="City" />
-            </div>
-            <div>
-              <label className="woa-input-label">COUNTRY</label>
-              <input className="woa-input" value={country} onChange={e => setCountry(e.target.value)} placeholder="Country" />
-            </div>
-          </div>
-        </div>
-
-        {/* Social links */}
-        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 20 }}>
-          <p style={{ fontSize: 9, letterSpacing: '0.2em', color: '#555', marginBottom: 14 }}>LINKS</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div>
-              <label className="woa-input-label">INSTAGRAM HANDLE</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-                <span style={{ background: '#111', border: '1px solid #222', borderRight: 'none', padding: '12px', fontSize: 11, color: '#555', letterSpacing: '0.04em' }}>@</span>
-                <input className="woa-input" value={instagram} onChange={e => setInstagram(e.target.value.replace('@', ''))} placeholder="yourhandle" style={{ borderLeft: 'none' }} />
-              </div>
-            </div>
-            <div>
-              <label className="woa-input-label">FACEBOOK</label>
-              <input className="woa-input" value={facebook} onChange={e => setFacebook(e.target.value)} placeholder="https://facebook.com/..." />
-            </div>
-            <div>
-              <label className="woa-input-label">WEBSITE</label>
-              <input className="woa-input" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://yoursite.com" />
-            </div>
-            {showArtistFields && (
+        {/* Location — not for GIG_POSTER or ART_LOVER */}
+        {!isGigPoster && !isArtLover && (
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 20 }}>
+            <p style={{ fontSize: 9, letterSpacing: '0.2em', color: '#555', marginBottom: 14 }}>LOCATION</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label className="woa-input-label">SPOTIFY / SOUNDCLOUD</label>
-                <input className="woa-input" value={spotifyUrl} onChange={e => setSpotifyUrl(e.target.value)} placeholder="https://open.spotify.com/..." />
+                <label className="woa-input-label">CITY</label>
+                <input className="woa-input" value={city} onChange={e => setCity(e.target.value)} placeholder="City" />
               </div>
-            )}
+              <div>
+                <label className="woa-input-label">COUNTRY</label>
+                <input className="woa-input" value={country} onChange={e => setCountry(e.target.value)} placeholder="Country" />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Social links — not for GIG_POSTER or ART_LOVER */}
+        {!isGigPoster && !isArtLover && (
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 20 }}>
+            <p style={{ fontSize: 9, letterSpacing: '0.2em', color: '#555', marginBottom: 14 }}>LINKS</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label className="woa-input-label">INSTAGRAM HANDLE</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                  <span style={{ background: '#111', border: '1px solid #222', borderRight: 'none', padding: '12px', fontSize: 11, color: '#555', letterSpacing: '0.04em' }}>@</span>
+                  <input className="woa-input" value={instagram} onChange={e => setInstagram(e.target.value.replace('@', ''))} placeholder="yourhandle" style={{ borderLeft: 'none' }} />
+                </div>
+              </div>
+              <div>
+                <label className="woa-input-label">FACEBOOK</label>
+                <input className="woa-input" value={facebook} onChange={e => setFacebook(e.target.value)} placeholder="https://facebook.com/..." />
+              </div>
+              <div>
+                <label className="woa-input-label">WEBSITE</label>
+                <input className="woa-input" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://yoursite.com" />
+              </div>
+              {showArtistFields && (
+                <div>
+                  <label className="woa-input-label">SPOTIFY / SOUNDCLOUD</label>
+                  <input className="woa-input" value={spotifyUrl} onChange={e => setSpotifyUrl(e.target.value)} placeholder="https://open.spotify.com/..." />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {showArtistFields && (
           <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 20 }}>

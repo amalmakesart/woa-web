@@ -48,8 +48,8 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-function sortByRecent<T extends { created_at?: string | null }>(arr: T[]): T[] {
-  return [...arr].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime());
+function sortByRecent<T>(arr: T[]): T[] {
+  return [...arr].sort((a: any, b: any) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime());
 }
 
 // ─── Filter Modal ─────────────────────────────────────────────────────────────

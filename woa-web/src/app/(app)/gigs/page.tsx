@@ -196,18 +196,30 @@ export default function GigsPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id ?? null)
+
+      let role: string | null = null
       if (user) {
         const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-        setCurrentUserRole((me as any)?.role ?? null)
+        role = (me as any)?.role ?? null
+        setCurrentUserRole(role)
       }
+
+      const isMyGigsView = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mine') === 'true'
 
       let query = supabase
         .from('gigs')
         .select('*')
-        .eq('status', 'active')
         .order('is_featured', { ascending: false })
         .order('created_at', { ascending: false })
-        .limit(50)
+        .limit(100)
+
+      if (isMyGigsView && user) {
+        query = query.eq('poster_id', user.id)
+      } else if (role === 'GIG_POSTER' && user) {
+        query = query.eq('poster_id', user.id)
+      } else {
+        query = query.eq('status', 'active')
+      }
 
       const { data } = await query
       setGigs((data as Gig[]) ?? [])
@@ -259,7 +271,7 @@ export default function GigsPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.02em' }}>GIG BOARD</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.02em' }}>{currentUserRole === 'GIG_POSTER' ? 'MY GIGS' : 'GIG BOARD'}</h1>
           {currentUserId && currentUserRole === 'GIG_POSTER' ? (
             <Link href="/gigs/new" className="btn-red" style={{ fontSize: 10, padding: '6px 14px' }}>
               POST A GIG ↗

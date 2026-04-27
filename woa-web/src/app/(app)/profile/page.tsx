@@ -29,12 +29,18 @@ interface Post {
   created_at: string
 }
 
-const MENU = [
-  { label: 'MY POSTS', href: '/profile/posts' },
-  { label: 'BOOKMARKS', href: '/profile/bookmarks' },
-  { label: 'EDIT PROFILE', href: '/profile/edit' },
-  { label: 'SETTINGS', href: '/profile/settings' },
-]
+function getMenu(role: string | null) {
+  const r = (role ?? '').toUpperCase()
+  const first = r === 'GIG_POSTER'
+    ? { label: 'MY GIGS', href: '/gigs?mine=true' }
+    : { label: 'MY POSTS', href: '/profile/posts' }
+  return [
+    first,
+    { label: 'BOOKMARKS', href: '/profile/bookmarks' },
+    { label: 'EDIT PROFILE', href: '/profile/edit' },
+    { label: 'SETTINGS', href: '/profile/settings' },
+  ]
+}
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -243,8 +249,11 @@ export default function ProfilePage() {
       {/* Portfolio tab */}
       {profileTab === 'portfolio' && (
         <div style={{ paddingTop: 24, marginBottom: 32 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+            <Link href="/profile/portfolio" className="btn-red" style={{ fontSize: 10, padding: '6px 14px', display: 'inline-block' }}>MANAGE PORTFOLIO</Link>
+          </div>
           {portfolio.length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#555', fontSize: 11, letterSpacing: '0.1em', padding: '40px 0' }}>NO PORTFOLIO SECTIONS YET — ADD THEM FROM THE APP</p>
+            <p style={{ textAlign: 'center', color: '#555', fontSize: 11, letterSpacing: '0.1em', padding: '40px 0' }}>NO PORTFOLIO SECTIONS YET</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {portfolio.map((section: any) => (
@@ -265,8 +274,11 @@ export default function ProfilePage() {
       {/* Shows tab */}
       {profileTab === 'shows' && (
         <div style={{ paddingTop: 24, marginBottom: 32 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+            <Link href="/profile/shows" className="btn-red" style={{ fontSize: 10, padding: '6px 14px', display: 'inline-block' }}>MANAGE SHOWS</Link>
+          </div>
           {shows.length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#555', fontSize: 11, letterSpacing: '0.1em', padding: '40px 0' }}>NO SHOWS ADDED YET — ADD THEM FROM THE APP</p>
+            <p style={{ textAlign: 'center', color: '#555', fontSize: 11, letterSpacing: '0.1em', padding: '40px 0' }}>NO SHOWS ADDED YET</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {shows.map((show: any) => {
@@ -335,7 +347,7 @@ export default function ProfilePage() {
 
       {/* Menu */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 24 }}>
-        {MENU.map(item => (
+        {getMenu(profile.role).map(item => (
           <Link
             key={item.href}
             href={item.href}

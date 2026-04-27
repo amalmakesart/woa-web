@@ -570,7 +570,14 @@ export default function FeedPage() {
             <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: '0.04em' }}>WOA</span>
             <span style={{ color: '#c0392b', fontSize: 8 }}>●</span>
           </div>
-          {currentUserId && currentUserRole !== 'ART_LOVER' ? (
+          {currentUserId && currentUserRole === 'GIG_POSTER' ? (
+            <button
+              onClick={() => window.alert('GIG POSTERS CAN ONLY POST GIGS. HEAD TO THE GIG BOARD TO POST YOUR NEXT OPPORTUNITY.')}
+              className="btn-red" style={{ fontSize: 10, padding: '6px 14px', cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}
+            >
+              + POST
+            </button>
+          ) : currentUserId && currentUserRole !== 'ART_LOVER' ? (
             <Link href="/feed/new" className="btn-red" style={{ fontSize: 10, padding: '6px 14px' }}>
               + POST
             </Link>

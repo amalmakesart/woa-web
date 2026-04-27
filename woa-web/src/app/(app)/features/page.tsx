@@ -26,7 +26,7 @@ const STEPS = [
   { n: '05', label: 'THE REWARD', body: 'YOU RECEIVE THE WOA FEATURE BADGE AND ARE RECOMMENDED TO VENUES AND ARTS ORGANIZATIONS ACROSS CANADA.' },
 ]
 
-function ComingSoon() {
+function ComingSoon({ isVerified }: { isVerified: boolean | null }) {
   const [time, setTime] = useState(getTimeLeft())
   useEffect(() => {
     const id = setInterval(() => setTime(getTimeLeft()), 1000)
@@ -70,11 +70,22 @@ function ComingSoon() {
         <p style={{ fontSize: 10, color: '#c0392b', letterSpacing: '0.1em' }}>JULY 10, 2026 — VANCOUVER ISLAND, BC</p>
       </div>
 
-      <div style={{ border: '1px solid #1a1a1a', padding: '20px', textAlign: 'center' }}>
-        <p style={{ fontSize: 11, color: '#888880', letterSpacing: '0.1em', lineHeight: 1.8 }}>
-          GET VERIFIED THROUGH YOUR PROFILE TO BE ELIGIBLE TO BE FEATURED.<br />
-          <span style={{ color: '#555' }}>ONLY VERIFIED WOA ARTISTS CAN BE SELECTED.</span>
-        </p>
+      <div style={{ border: `1px solid ${isVerified ? '#f6c55a' : '#1a1a1a'}`, padding: '20px', textAlign: 'center', background: isVerified ? '#0a0800' : 'transparent' }}>
+        {isVerified ? (
+          <>
+            <span style={{ display: 'inline-block', fontSize: 9, fontWeight: 700, background: '#f6c55a', color: '#000', padding: '3px 9px', letterSpacing: '0.18em', marginBottom: 10 }}>WOA VERIFIED</span>
+            <p style={{ fontSize: 11, color: '#f6c55a', letterSpacing: '0.1em', lineHeight: 1.8 }}>
+              YOU ARE ELIGIBLE TO BE FEATURED. WE WILL REACH OUT IF YOU ARE SELECTED FOR YOUR CITY.
+            </p>
+          </>
+        ) : isVerified === false ? (
+          <p style={{ fontSize: 11, color: '#888880', letterSpacing: '0.1em', lineHeight: 1.8 }}>
+            GET VERIFIED THROUGH YOUR PROFILE SETTINGS TO BE ELIGIBLE TO BE FEATURED.<br />
+            <span style={{ color: '#555' }}>ONLY VERIFIED WOA ARTISTS CAN BE SELECTED.</span>
+          </p>
+        ) : (
+          <p style={{ fontSize: 11, color: '#555', letterSpacing: '0.1em' }}>SIGN IN TO CHECK YOUR ELIGIBILITY.</p>
+        )}
       </div>
     </div>
   )
@@ -105,10 +116,19 @@ export default function FeaturesPage() {
   const [features, setFeatures] = useState<Feature[]>([])
   const [loading, setLoading] = useState(true)
   const [playing, setPlaying] = useState<string | null>(null)
+  const [isVerified, setIsVerified] = useState<boolean | null>(null)
 
   useEffect(() => {
     async function load() {
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: me } = await supabase.from('profiles').select('is_verified, role').eq('id', user.id).single()
+        const role = (me as any)?.role
+        if (role === 'ARTIST' || role === 'COLLECTIVE') {
+          setIsVerified(!!(me as any)?.is_verified)
+        }
+      }
       const { data } = await supabase
         .from('features')
         .select('id, title, description, thumbnail_url, video_url, duration, artist_id, created_at')
@@ -224,7 +244,7 @@ export default function FeaturesPage() {
           LOADING...
         </div>
       ) : features.length === 0 ? (
-        <ComingSoon />
+        <ComingSoon isVerified={isVerified} />
       ) : (
         <>
           {/* Hero feature */}

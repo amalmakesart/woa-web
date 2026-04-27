@@ -550,7 +550,7 @@ export default function ArtistProfilePage() {
                   {show.venue && <p style={{ fontSize: 11, color: '#888880', letterSpacing: '0.08em', marginBottom: 4 }}>{show.venue.toUpperCase()}</p>}
                   {show.city && <p style={{ fontSize: 11, color: '#888880', letterSpacing: '0.08em' }}>{show.city.toUpperCase()}</p>}
                   {show.ticket_url && (
-                    <a href={show.ticket_url} target="_blank" rel="noopener noreferrer" className="btn-red" style={{ fontSize: 9, padding: '4px 12px', marginTop: 8, display: 'inline-block' }}>TICKETS ↗</a>
+                    <a href={/^https?:\/\//i.test(show.ticket_url) ? show.ticket_url : `https://${show.ticket_url}`} target="_blank" rel="noopener noreferrer" className="btn-red" style={{ fontSize: 9, padding: '4px 12px', marginTop: 8, display: 'inline-block' }}>TICKETS ↗</a>
                   )}
                 </div>
               </div>

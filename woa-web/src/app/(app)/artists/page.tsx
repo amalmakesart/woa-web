@@ -153,12 +153,10 @@ function Chip({
   )
 }
 
-function sortByFollowerCount<T extends { follower_count?: number | null }>(artists: T[]): T[] {
-  return [...artists].sort((a, b) => {
-    const aCount = Number(a.follower_count ?? 0)
-    const bCount = Number(b.follower_count ?? 0)
-    return bCount - aCount
-  })
+function sortByRecent<T extends { created_at?: string | null }>(artists: T[]): T[] {
+  return [...artists].sort((a, b) =>
+    new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+  )
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
@@ -187,12 +185,11 @@ export default function ArtistsPage() {
       setCurrentUserId(user?.id ?? null)
       const { data } = await supabase
         .from('profiles')
-        .select('id, username, full_name, role, art_type, art_types, discipline, is_available, is_verified, profile_photo_url, city, country, follower_count')
+        .select('id, username, full_name, role, art_type, art_types, discipline, is_available, is_verified, profile_photo_url, city, country, follower_count, created_at')
         .in('role', ['ARTIST', 'COLLECTIVE'])
-        .order('follower_count', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(300)
-      const mapped = sortByFollowerCount(((data as any[]) ?? []).map(a => ({
+      const mapped = sortByRecent(((data as any[]) ?? []).map(a => ({
         ...a,
         art_types: a.art_types ?? [],
         discipline: a.discipline ?? null,
@@ -254,7 +251,7 @@ export default function ArtistsPage() {
     if (availableOnly) result = result.filter(a => a.is_available)
     if (collectivesOnly) result = result.filter(a => a.role === 'COLLECTIVE')
     if (verifiedOnly) result = result.filter(a => a.is_verified)
-    return sortByFollowerCount(result)
+    return sortByRecent(result)
   }, [allArtists, search, countryFilter, cityFilter, disciplineFilter, tagFilter, availableOnly, collectivesOnly, verifiedOnly])
 
   function shuffle() {
