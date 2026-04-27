@@ -105,7 +105,6 @@ export default function ManageShowsPage() {
                 <label className="woa-input-label">TIME (OPTIONAL)</label>
                 <input className="woa-input" type="time" value={showTime} onChange={e => setShowTime(e.target.value)} style={{ colorScheme: 'dark' }} />
               </div>
-            </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
