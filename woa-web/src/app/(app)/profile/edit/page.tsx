@@ -37,6 +37,8 @@ const ART_TYPES_BY_DISCIPLINE: Record<string, string[]> = {
   'Interdisciplinary Artist': ['Multimedia Artist','Interdisciplinary Artist','Installation Artist','Experience Designer','Interactive Artist','VR Artist','AR Artist','Sound Artist','Light Artist','Environmental Artist','Community Artist','AI Artist'],
 }
 
+const ALL_ART_TYPES = Array.from(new Set(Object.values(ART_TYPES_BY_DISCIPLINE).flat())).sort()
+
 export default function EditProfilePage() {
   const router = useRouter()
   const [targetId, setTargetId] = useState<string | null>(null)
