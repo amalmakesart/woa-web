@@ -56,6 +56,59 @@ function timeAgo(dateStr: string) {
   return Math.floor(d / 7) + 'W'
 }
 
+function FeedCarousel({ urls }: { urls: string[] }) {
+  const [idx, setIdx] = useState(0)
+  if (urls.length === 0) return null
+
+  function go(e: React.MouseEvent, next: number) {
+    e.preventDefault()
+    e.stopPropagation()
+    setIdx(Math.max(0, Math.min(urls.length - 1, next)))
+  }
+
+  return (
+    <div style={{ position: 'relative', lineHeight: 0, marginBottom: 14, userSelect: 'none' }}>
+      <img
+        src={urls[idx]}
+        alt=""
+        style={{ width: '100%', maxHeight: 480, objectFit: 'cover', display: 'block' }}
+      />
+
+      {/* Left arrow */}
+      {idx > 0 && (
+        <button
+          onClick={e => go(e, idx - 1)}
+          style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 48, background: 'linear-gradient(to right, rgba(0,0,0,0.45), transparent)', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', paddingLeft: 10, fontFamily: 'inherit' }}
+          aria-label="Previous"
+        >‹</button>
+      )}
+
+      {/* Right arrow */}
+      {idx < urls.length - 1 && (
+        <button
+          onClick={e => go(e, idx + 1)}
+          style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 48, background: 'linear-gradient(to left, rgba(0,0,0,0.45), transparent)', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 10, fontFamily: 'inherit' }}
+          aria-label="Next"
+        >›</button>
+      )}
+
+      {/* Dots */}
+      {urls.length > 1 && (
+        <div style={{ position: 'absolute', bottom: 10, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 5, pointerEvents: 'none' }}>
+          {urls.map((_, i) => (
+            <div key={i} style={{ width: i === idx ? 16 : 6, height: 6, borderRadius: 3, background: i === idx ? '#fff' : 'rgba(255,255,255,0.45)', transition: 'all 0.2s' }} />
+          ))}
+        </div>
+      )}
+
+      {/* Counter */}
+      <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 10, padding: '2px 7px', letterSpacing: '0.08em', fontFamily: 'inherit', pointerEvents: 'none' }}>
+        {idx + 1} / {urls.length}
+      </span>
+    </div>
+  )
+}
+
 function CommentIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 17 17" fill="none" style={{ display: 'block' }}>
@@ -217,20 +270,10 @@ function PostCard({
       )}
 
       {/* Media */}
-      {post.type === 'image' && post.media_url && (
-        <div style={{ marginBottom: 14, lineHeight: 0, position: 'relative' }}>
-          <img
-            src={post.media_url}
-            alt={post.title ?? 'Post image'}
-            style={{ width: '100%', maxHeight: 480, objectFit: 'cover', display: 'block' }}
-          />
-          {(post.media_urls?.length ?? 0) > 1 && (
-            <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 10, padding: '3px 8px', letterSpacing: '0.1em', fontFamily: 'inherit' }}>
-              ⊞ {post.media_urls!.length}
-            </span>
-          )}
-        </div>
-      )}
+      {post.type === 'image' && (() => {
+        const urls = post.media_urls?.length ? post.media_urls : post.media_url ? [post.media_url] : []
+        return urls.length > 0 ? <FeedCarousel urls={urls} /> : null
+      })()}
 
       {post.type === 'video' && post.media_url && (
         <div style={{ marginBottom: 14 }}>

@@ -293,13 +293,6 @@ export default function GigDetailPage() {
       {canManage && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
-            onClick={() => router.push(`/gigs/new?edit=${gig.id}`)}
-            className="btn-primary"
-            style={{ flex: 1 }}
-          >
-            EDIT GIG
-          </button>
-          <button
             onClick={() => router.push(`/gigs/${id}/interested`)}
             className="btn-primary"
             style={{ flex: 1 }}
@@ -313,6 +306,15 @@ export default function GigDetailPage() {
           >
             DELETE GIG
           </button>
+          {isAdmin && (
+            <button
+              onClick={() => router.push(`/gigs/new?edit=${gig.id}`)}
+              className="btn-primary"
+              style={{ flex: 1 }}
+            >
+              ADMIN EDIT
+            </button>
+          )}
         </div>
       )}
     </div>

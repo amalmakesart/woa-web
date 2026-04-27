@@ -105,6 +105,7 @@ export default function ArtistProfilePage() {
   const [followingCount, setFollowingCount] = useState(0)
   const [tab, setTab] = useState<ProfileTab>('posts')
   const [messagingLoading, setMessagingLoading] = useState(false)
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [followModal, setFollowModal] = useState<'followers' | 'following' | null>(null)
   const [followList, setFollowList] = useState<FollowUser[]>([])
   const [followListLoading, setFollowListLoading] = useState(false)
@@ -116,6 +117,10 @@ export default function ArtistProfilePage() {
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id ?? null)
       setIsAdmin(isAdminEmail(user?.email))
+      if (user) {
+        const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        setCurrentUserRole((me as any)?.role ?? null)
+      }
 
       const [
         { data: prof },
@@ -377,9 +382,11 @@ export default function ArtistProfilePage() {
                 style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em', border: isFollowing ? '1px solid rgba(255,255,255,0.2)' : undefined, background: isFollowing ? 'transparent' : undefined, color: isFollowing ? '#888880' : undefined, cursor: 'pointer', fontFamily: 'inherit' }}>
                 {isFollowing ? '✓ FOLLOWING' : 'FOLLOW'}
               </button>
-              <button onClick={handleMessage} className="btn-red" style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em' }} disabled={messagingLoading}>
-                {messagingLoading ? '...' : 'MESSAGE'}
-              </button>
+              {currentUserRole !== 'GIG_POSTER' && (
+                <button onClick={handleMessage} className="btn-red" style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em' }} disabled={messagingLoading}>
+                  {messagingLoading ? '...' : 'MESSAGE'}
+                </button>
+              )}
               <button
                 onClick={handleShareProfile}
                 style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em', border: '1px solid rgba(255,255,255,0.16)', background: 'transparent', color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}

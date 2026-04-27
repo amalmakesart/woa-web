@@ -284,27 +284,15 @@ export default function EditProfilePage() {
               </div>
               <div>
                 <label className="woa-input-label">YEARS OF EXPERIENCE</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {EXPERIENCE_OPTIONS.map(opt => (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => setExperience(experience === opt ? '' : opt)}
-                      style={{
-                        padding: '8px 14px',
-                        fontSize: 10,
-                        letterSpacing: '0.08em',
-                        border: experience === opt ? '1px solid #fff' : '1px solid #333',
-                        background: experience === opt ? '#fff' : 'transparent',
-                        color: experience === opt ? '#000' : '#888',
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
+                <input
+                  className="woa-input"
+                  type="number"
+                  value={experience}
+                  onChange={e => setExperience(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="E.G. 5"
+                  min="0"
+                  max="99"
+                />
               </div>
               <div>
                 <label className="woa-input-label">ART TYPES (SELECT UP TO 5)</label>

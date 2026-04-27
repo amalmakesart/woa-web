@@ -10,6 +10,7 @@ interface Show {
   venue: string | null
   city: string | null
   show_date: string
+  show_time: string | null
   ticket_url: string | null
 }
 
@@ -26,6 +27,7 @@ export default function ManageShowsPage() {
   const [venue, setVenue] = useState('')
   const [city, setCity] = useState('')
   const [showDate, setShowDate] = useState('')
+  const [showTime, setShowTime] = useState('')
   const [ticketUrl, setTicketUrl] = useState('')
   const [showForm, setShowForm] = useState(false)
 
@@ -37,7 +39,7 @@ export default function ManageShowsPage() {
       setUserId(user.id)
       const { data } = await supabase
         .from('shows')
-        .select('id, title, venue, city, show_date, ticket_url')
+        .select('id, title, venue, city, show_date, show_time, ticket_url')
         .eq('artist_id', user.id)
         .order('show_date', { ascending: false })
       setShows((data as Show[]) ?? [])
@@ -58,11 +60,12 @@ export default function ManageShowsPage() {
       venue: venue.trim() || null,
       city: city.trim() || null,
       show_date: showDate,
+      show_time: showTime || null,
       ticket_url: ticketUrl.trim() || null,
     }).select('id, title, venue, city, show_date, ticket_url').single()
     if (err) { setError(err.message); setSaving(false); return }
     setShows(prev => [data as Show, ...prev])
-    setTitle(''); setVenue(''); setCity(''); setShowDate(''); setTicketUrl('')
+    setTitle(''); setVenue(''); setCity(''); setShowDate(''); setShowTime(''); setTicketUrl('')
     setShowForm(false)
     setSaving(false)
   }
@@ -93,9 +96,16 @@ export default function ManageShowsPage() {
             <label className="woa-input-label">SHOW / EVENT TITLE *</label>
             <input className="woa-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="E.G. LIVE AT THE JAZZ ROOM" required />
           </div>
-          <div>
-            <label className="woa-input-label">DATE *</label>
-            <input className="woa-input" type="date" value={showDate} onChange={e => setShowDate(e.target.value)} style={{ colorScheme: 'dark' }} required />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="woa-input-label">DATE *</label>
+                <input className="woa-input" type="date" value={showDate} onChange={e => setShowDate(e.target.value)} style={{ colorScheme: 'dark' }} required />
+              </div>
+              <div>
+                <label className="woa-input-label">TIME (OPTIONAL)</label>
+                <input className="woa-input" type="time" value={showTime} onChange={e => setShowTime(e.target.value)} style={{ colorScheme: 'dark' }} />
+              </div>
+            </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
@@ -132,7 +142,10 @@ export default function ManageShowsPage() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 2 }}>{show.title}</p>
-                  <p style={{ fontSize: 10, color: '#888880', letterSpacing: '0.06em' }}>{[show.venue, show.city].filter(Boolean).join(' · ').toUpperCase()}</p>
+                  <p style={{ fontSize: 10, color: '#888880', letterSpacing: '0.06em' }}>
+                    {[show.venue, show.city].filter(Boolean).join(' · ').toUpperCase()}
+                    {show.show_time && <span style={{ color: '#555' }}> · {show.show_time}</span>}
+                  </p>
                   {isPast && <span style={{ fontSize: 9, color: '#555', letterSpacing: '0.1em' }}>PAST</span>}
                   {show.ticket_url && (
                     <a href={/^https?:\/\//i.test(show.ticket_url) ? show.ticket_url : `https://${show.ticket_url}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 6, fontSize: 9, color: '#c0392b', letterSpacing: '0.1em' }}>
