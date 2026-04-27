@@ -11,28 +11,36 @@ type Step = 1 | 2 | 3 | 4
 type UsernameStatus = 'idle' | 'checking' | 'taken' | 'available'
 
 const DISCIPLINES = [
-  'VISUAL ARTIST', 'PHOTOGRAPHER', 'VIDEOGRAPHER', 'FILMMAKER',
-  'MUSICIAN', 'SINGER', 'DJ', 'PRODUCER', 'MODEL', 'ACTOR',
-  'DANCER', 'CHOREOGRAPHER', 'PAINTER', 'ILLUSTRATOR', 'GRAPHIC DESIGNER',
-  'ANIMATOR', 'MURALIST', 'SCULPTOR', 'TATTOO ARTIST', 'FASHION DESIGNER',
-  'MAKEUP ARTIST', 'HAIR STYLIST', 'WRITER', 'CHEF', 'PERFORMER', 'OTHER',
+  'Photographer', 'Musician', 'Videographer', 'Model', 'Dancer', 'Filmmaker',
+  'Visual Artist', 'Graphic Designer', 'Muralist', 'Actor', 'DJ', 'Tattoo Artist',
+  'Fashion Designer', 'Animator', 'Illustrator', 'Writer', 'Chef', 'Makeup Artist',
+  'Hair Stylist', 'Performer', 'Craftsperson', 'Interdisciplinary Artist',
 ]
 
-const ALL_ART_TYPES = [
-  'ABSTRACT', 'ACRYLIC', 'ALBUM ART', 'ANIMATION', 'ARCHITECTURE', 'BAND PHOTOGRAPHY',
-  'BLACK & WHITE', 'BOOK COVER', 'BRANDING', 'CALLIGRAPHY', 'CERAMICS', 'CHARACTER DESIGN',
-  'CHARCOAL', 'COLLAGE', 'COMIC ART', 'CONCEPT ART', 'COVER ART', 'DANCE',
-  'DIGITAL ART', 'DOCUMENTARY', 'EDITORIAL', 'EMBROIDERY', 'EXPERIMENTAL', 'FASHION',
-  'FILM PHOTOGRAPHY', 'FINE ART', 'FLORAL', 'FOLK ART', 'FOOD PHOTOGRAPHY', 'FRESCO',
-  'GAME ART', 'GLASSWORK', 'GRAFFITI', 'GRAPHIC NOVEL', 'ILLUSTRATION', 'INK',
-  'INSTALLATION ART', 'JEWELRY', 'LANDSCAPE', 'LETTERING', 'LIGHT ART', 'LIVE MUSIC',
-  'LOGO DESIGN', 'MAKEUP ART', 'MIXED MEDIA', 'MOSAIC', 'MOTION GRAPHICS', 'MURAL',
-  'NATURE', 'NFT ART', 'OIL PAINTING', 'ORIGAMI', 'PAINTING', 'PAPER ART',
-  'PASTEL', 'PATTERN', 'PERFORMANCE ART', 'PHOTOGRAPHY', 'PIXEL ART', 'PORTRAIT',
-  'POSTER DESIGN', 'POTTERY', 'PRINT', 'SCULPTURE', 'SKETCH', 'SOUND DESIGN',
-  'SPOKEN WORD', 'SPRAY PAINT', 'STREET ART', 'STREET PHOTOGRAPHY', 'TATTOO',
-  'TEXTILE', 'TYPOGRAPHY', 'UI/UX', 'VIDEO ART', 'WATERCOLOR', 'WEB DESIGN', 'WOODWORK',
-]
+const ART_TYPES_BY_DISCIPLINE: Record<string, string[]> = {
+  'Photographer': ['Portrait Photographer','Fashion Photographer','Documentary Photographer','Event Photographer','Wedding Photographer','Music Photographer','Food Photographer','Product Photographer','Commercial Photographer','Architectural Photographer','Analog Photographer','Photo Retoucher'],
+  'Musician': ['Singer','Songwriter','Composer','Producer','Beatmaker','Multi-Instrumentalist','Pianist','Guitarist','Bassist','Drummer','Violinist','Cellist','Saxophonist','Trumpet Player','Percussionist','Vocalist','Choir Singer','Opera Singer','Sound Designer','Audio Engineer','Mixing Engineer','Mastering Engineer'],
+  'Videographer': ['Videographer','Director','Cinematographer','Camera Operator','Video Editor','Documentary Videographer','Event Videographer','Music Video Director','Drone Videographer','Motion Graphics Editor','Colorist','Livestream Producer'],
+  'Model': ['Fashion Model','Runway Model','Commercial Model','Editorial Model','Fit Model','Plus-Size Model','Beauty Model','Lifestyle Model','Hand Model','Brand Ambassador'],
+  'Dancer': ['Contemporary Dancer','Hip Hop Dancer','Ballet Dancer','Latin Dancer','Jazz Dancer','Choreographer','Dance Captain','Movement Director','Backup Dancer'],
+  'Filmmaker': ['Director','Screenwriter','Producer','Assistant Director','Cinematographer','Editor','Gaffer','Production Designer','Set Designer','Documentary Filmmaker','Short Film Director'],
+  'Visual Artist': ['Painter','Sculptor','Ceramic Artist','Mixed Media Artist','Printmaker','Installation Artist','Digital Artist','Street Artist','Calligrapher','Collage Artist','Glass Artist','Textile Artist','Fiber Artist','Conceptual Artist'],
+  'Graphic Designer': ['Brand Designer','Poster Designer','Editorial Designer','Motion Designer','Packaging Designer','UI Designer','Web Designer','Type Designer','Illustrator','3D Designer'],
+  'Muralist': ['Public Muralist','Street Muralist','Community Muralist','Live Painter','Lettering Artist','Large-Scale Illustrator'],
+  'Actor': ['Film Actor','Theatre Actor','Voice Actor','Commercial Actor','Improviser','Musical Theatre Performer','Stunt Performer'],
+  'DJ': ['Club DJ','Event DJ','Radio DJ','Turntablist','Open Format DJ','House DJ','Hip Hop DJ','Afrobeat DJ','Wedding DJ'],
+  'Tattoo Artist': ['Fine Line Tattoo Artist','Traditional Tattoo Artist','Blackwork Tattoo Artist','Colour Tattoo Artist','Illustrative Tattoo Artist','Handpoke Artist'],
+  'Fashion Designer': ['Womenswear Designer','Menswear Designer','Costume Designer','Textile Designer','Pattern Maker','Stylist','Accessory Designer','Jewelry Designer'],
+  'Animator': ['2D Animator','3D Animator','Motion Designer','Stop Motion Animator','Character Animator','Storyboard Artist','VFX Artist'],
+  'Illustrator': ['Editorial Illustrator','Children\'s Illustrator','Comic Artist','Character Designer','Concept Artist','Surface Designer','Book Cover Illustrator'],
+  'Writer': ['Screenwriter','Playwright','Novelist','Poet','Copywriter','Journalist','Essayist','Spoken Word Artist','Zine Maker','Lyricist'],
+  'Chef': ['Chef','Baker','Pastry Chef','Food Stylist','Caterer','Mixologist','Barista','Chocolatier'],
+  'Makeup Artist': ['Bridal Makeup Artist','Editorial Makeup Artist','SFX Makeup Artist','Film Makeup Artist','Beauty Educator','Drag Makeup Artist'],
+  'Hair Stylist': ['Session Stylist','Bridal Stylist','Barber','Colorist','Wig Stylist','Natural Hair Stylist'],
+  'Performer': ['Comedian','Drag Performer','Spoken Word Performer','Host','MC','Magician','Circus Performer','Puppeteer','Performance Artist','Storyteller'],
+  'Craftsperson': ['Woodworker','Furniture Maker','Weaver','Embroiderer','Ceramic Artist','Leatherworker','Metalworker','Candle Maker','Soap Maker','Mosaic Artist','Bookbinder','Paper Artist'],
+  'Interdisciplinary Artist': ['Multimedia Artist','Interdisciplinary Artist','Installation Artist','Experience Designer','Interactive Artist','VR Artist','AR Artist','Sound Artist','Light Artist','Environmental Artist','Community Artist','AI Artist'],
+}
 
 const COLLECTIVE_TYPES = [
   'GALLERY', 'RECORD LABEL', 'DANCE COMPANY', 'THEATRE COMPANY',
@@ -85,19 +93,23 @@ function AvatarUpload({ preview, onChange }: { preview: string | null; onChange:
   )
 }
 
+const ALL_ART_TYPES = Array.from(new Set(Object.values(ART_TYPES_BY_DISCIPLINE).flat())).sort()
+
 function ArtTypeGrid({
-  selected, onToggle, max, label,
+  selected, onToggle, max, label, tags,
 }: {
   selected: string[]
   onToggle: (type: string) => void
   max: number
   label: string
+  tags?: string[]
 }) {
+  const list = tags ?? ALL_ART_TYPES
   return (
     <div>
       <label className="woa-input-label">{label} (UP TO {max} — OPTIONAL)</label>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-        {ALL_ART_TYPES.map(type => {
+        {list.map(type => {
           const active = selected.includes(type)
           const disabled = !active && selected.length >= max
           return (
@@ -698,6 +710,7 @@ export default function SignupPage() {
                   onToggle={type => toggleArtType(type, 5, artTypes, setArtTypes)}
                   max={5}
                   label="TAGS / SPECIALTIES"
+                  tags={ART_TYPES_BY_DISCIPLINE[discipline] ?? []}
                 />
               </div>
             )}

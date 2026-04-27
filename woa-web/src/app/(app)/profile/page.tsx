@@ -130,6 +130,7 @@ export default function ProfilePage() {
     <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px' }}>
       {/* Profile header */}
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', marginBottom: 32 }}>
+        <Link href={`/artists/${profile.id}`} style={{ flexShrink: 0 }}>
         {profile.profile_photo_url ? (
           <img
             src={profile.profile_photo_url}
@@ -155,6 +156,7 @@ export default function ProfilePage() {
             ◯
           </div>
         )}
+        </Link>
 
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
