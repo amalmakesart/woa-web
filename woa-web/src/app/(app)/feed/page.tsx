@@ -25,6 +25,7 @@ interface Post {
   content: string | null
   title: string | null
   media_url: string | null
+  media_urls: string[] | null
   tags: string[]
   like_count: number
   comment_count: number
@@ -195,12 +196,17 @@ function PostCard({
 
       {/* Media */}
       {post.type === 'image' && post.media_url && (
-        <div style={{ marginBottom: 14, lineHeight: 0 }}>
+        <div style={{ marginBottom: 14, lineHeight: 0, position: 'relative' }}>
           <img
             src={post.media_url}
             alt={post.title ?? 'Post image'}
-            style={{ width: '100%', maxHeight: 480, objectFit: 'cover' }}
+            style={{ width: '100%', maxHeight: 480, objectFit: 'cover', display: 'block' }}
           />
+          {(post.media_urls?.length ?? 0) > 1 && (
+            <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 10, padding: '3px 8px', letterSpacing: '0.1em', fontFamily: 'inherit' }}>
+              ⊞ {post.media_urls!.length}
+            </span>
+          )}
         </div>
       )}
 

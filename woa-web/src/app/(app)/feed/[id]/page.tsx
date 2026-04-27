@@ -14,12 +14,58 @@ interface Post {
   content: string | null
   title: string | null
   media_url: string | null
+  media_urls: string[] | null
   tags: string[]
   like_count: number
   comment_count: number
   created_at: string
   profiles?: { username: string | null; full_name: string | null; profile_photo_url: string | null; art_type: string | null } | null
   collaborators?: { id: string; username: string | null; full_name: string | null }[]
+}
+
+function ImageCarousel({ urls }: { urls: string[] }) {
+  const [idx, setIdx] = useState(0)
+  if (urls.length === 0) return null
+  if (urls.length === 1) {
+    return (
+      <div style={{ marginBottom: 16, lineHeight: 0 }}>
+        <img src={urls[0]} alt="" style={{ width: '100%', maxHeight: 560, objectFit: 'cover', display: 'block' }} />
+      </div>
+    )
+  }
+  return (
+    <div style={{ position: 'relative', marginBottom: 16, lineHeight: 0, userSelect: 'none' }}>
+      <img src={urls[idx]} alt="" style={{ width: '100%', maxHeight: 560, objectFit: 'cover', display: 'block' }} />
+
+      {/* Prev */}
+      <button
+        onClick={() => setIdx(i => Math.max(0, i - 1))}
+        disabled={idx === 0}
+        style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 44, background: 'none', border: 'none', color: '#fff', fontSize: 28, cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0 : 1, transition: 'opacity 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
+        aria-label="Previous image"
+      >‹</button>
+
+      {/* Next */}
+      <button
+        onClick={() => setIdx(i => Math.min(urls.length - 1, i + 1))}
+        disabled={idx === urls.length - 1}
+        style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 44, background: 'none', border: 'none', color: '#fff', fontSize: 28, cursor: idx === urls.length - 1 ? 'default' : 'pointer', opacity: idx === urls.length - 1 ? 0 : 1, transition: 'opacity 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
+        aria-label="Next image"
+      >›</button>
+
+      {/* Counter */}
+      <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 10, padding: '3px 8px', letterSpacing: '0.1em', fontFamily: 'inherit', pointerEvents: 'none' }}>
+        {idx + 1} / {urls.length}
+      </span>
+
+      {/* Dot indicators */}
+      <div style={{ position: 'absolute', bottom: 10, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, pointerEvents: 'none' }}>
+        {urls.map((_, i) => (
+          <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: i === idx ? '#fff' : 'rgba(255,255,255,0.35)', transition: 'background 0.15s' }} />
+        ))}
+      </div>
+    </div>
+  )
 }
 
 interface Comment {
@@ -277,11 +323,10 @@ export default function PostDetailPage() {
       )}
 
       {/* Media */}
-      {post.type === 'image' && post.media_url && (
-        <div style={{ marginBottom: 16, lineHeight: 0 }}>
-          <img src={post.media_url} alt={post.title ?? ''} style={{ width: '100%', maxHeight: 560, objectFit: 'cover' }} />
-        </div>
-      )}
+      {post.type === 'image' && (() => {
+        const urls = post.media_urls?.length ? post.media_urls : post.media_url ? [post.media_url] : []
+        return urls.length > 0 ? <ImageCarousel urls={urls} /> : null
+      })()}
       {post.type === 'video' && post.media_url && (
         <div style={{ marginBottom: 16 }}>
           <video src={post.media_url} controls style={{ width: '100%', maxHeight: 480, background: '#111' }} />
