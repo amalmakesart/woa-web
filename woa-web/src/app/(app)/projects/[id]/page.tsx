@@ -50,6 +50,7 @@ export default function ProjectDetailPage() {
   const [comments, setComments] = useState<ProjectComment[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [commentText, setCommentText] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -62,6 +63,10 @@ export default function ProjectDetailPage() {
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id ?? null)
       setIsAdmin(isAdminEmail(user?.email))
+      if (user) {
+        const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        setCurrentUserRole((me as any)?.role ?? null)
+      }
 
       const [{ data: projectData }, { data: commentsData }] = await Promise.all([
         supabase.from('projects').select('*').eq('id', projectId).single(),
@@ -293,7 +298,7 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Comment input */}
-      {currentUserId && !project.is_closed && (
+      {currentUserId && !project.is_closed && currentUserRole !== 'ART_LOVER' && (
         <form
           onSubmit={handleComment}
           style={{

@@ -185,7 +185,7 @@ export default function ProjectsPage() {
       if (user) {
         const { data: profile } = await supabase
           .from('profiles').select('role').eq('id', user.id).single()
-        setCanPost((profile as any)?.role !== 'GIG_POSTER')
+        setCanPost(!['GIG_POSTER', 'ART_LOVER'].includes((profile as any)?.role))
       }
 
       const { data } = await supabase

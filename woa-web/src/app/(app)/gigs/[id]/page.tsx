@@ -39,6 +39,7 @@ export default function GigDetailPage() {
   const [gig, setGig] = useState<Gig | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [hasInterest, setHasInterest] = useState(false)
   const [message, setMessage] = useState('')
@@ -51,6 +52,10 @@ export default function GigDetailPage() {
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id ?? null)
       setIsAdmin(isAdminEmail(user?.email))
+      if (user) {
+        const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        setCurrentUserRole((me as any)?.role ?? null)
+      }
 
       const [{ data: gigData }, { data: interest }] = await Promise.all([
         supabase.from('gigs').select('*').eq('id', id).single(),
@@ -208,7 +213,7 @@ export default function GigDetailPage() {
       )}
 
       {/* Express interest */}
-      {!isOwner && gig.status === 'active' && (
+      {!isOwner && gig.status === 'active' && currentUserRole !== 'ART_LOVER' && (
         <div
           style={{
             border: '1px solid rgba(255,255,255,0.1)',

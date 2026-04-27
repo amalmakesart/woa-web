@@ -34,6 +34,7 @@ export default function MyPostsPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [view, setView] = useState<'grid' | 'list'>('grid')
 
@@ -43,6 +44,8 @@ export default function MyPostsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setCurrentUserId(user.id)
+      const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      setCurrentUserRole((me as any)?.role ?? null)
 
       const [{ data: ownedPosts }, { data: collaboratorRows }] = await Promise.all([
         supabase
@@ -113,14 +116,18 @@ export default function MyPostsPage() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <p style={{ fontSize: 10, color: '#555', letterSpacing: '0.1em' }}>{posts.length} POSTS</p>
-        <Link href="/feed/new" className="btn-red" style={{ fontSize: 10, padding: '8px 16px' }}>+ NEW POST</Link>
+        {currentUserRole !== 'ART_LOVER' && (
+          <Link href="/feed/new" className="btn-red" style={{ fontSize: 10, padding: '8px 16px' }}>+ NEW POST</Link>
+        )}
       </div>
 
       {posts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#888880' }}>
           <p style={{ fontSize: 12, letterSpacing: '0.2em', marginBottom: 8 }}>NO POSTS YET</p>
           <p style={{ fontSize: 10, letterSpacing: '0.12em', color: '#555', marginBottom: 20 }}>SHARE YOUR WORK WITH THE COMMUNITY</p>
-          <Link href="/feed/new" className="btn-primary" style={{ padding: '10px 24px', fontSize: 11 }}>CREATE A POST</Link>
+          {currentUserRole !== 'ART_LOVER' && (
+            <Link href="/feed/new" className="btn-primary" style={{ padding: '10px 24px', fontSize: 11 }}>CREATE A POST</Link>
+          )}
         </div>
       ) : view === 'grid' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>

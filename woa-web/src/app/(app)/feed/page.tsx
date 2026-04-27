@@ -324,6 +324,7 @@ export default function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set())
@@ -336,6 +337,10 @@ export default function FeedPage() {
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id ?? null)
       setIsAdmin(isAdminEmail(user?.email))
+      if (user) {
+        const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        setCurrentUserRole((me as any)?.role ?? null)
+      }
 
       let postsQuery = supabase
         .from('posts')
@@ -517,15 +522,15 @@ export default function FeedPage() {
             <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: '0.04em' }}>WOA</span>
             <span style={{ color: '#c0392b', fontSize: 8 }}>●</span>
           </div>
-          {currentUserId ? (
+          {currentUserId && currentUserRole !== 'ART_LOVER' ? (
             <Link href="/feed/new" className="btn-red" style={{ fontSize: 10, padding: '6px 14px' }}>
               + POST
             </Link>
-          ) : (
+          ) : !currentUserId ? (
             <button onClick={() => setShowSignUp(true)} className="btn-red" style={{ fontSize: 10, padding: '6px 14px', cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}>
               + POST
             </button>
-          )}
+          ) : null}
         </div>
 
         {/* Tabs */}

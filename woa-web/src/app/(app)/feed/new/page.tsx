@@ -89,7 +89,11 @@ export default function NewPostPage() {
     async function loadUser() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      setCurrentUserId(user?.id ?? null)
+      if (!user) { router.push('/login'); return }
+      setCurrentUserId(user.id)
+
+      const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      if ((me as any)?.role === 'ART_LOVER') { router.replace('/feed'); return }
 
       if (user?.id) {
         const { data: cols } = await supabase
