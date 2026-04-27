@@ -28,6 +28,7 @@ interface Artist {
   follower_count: number
   is_verified: boolean
   is_available: boolean
+  created_at: string | null
 }
 
 // ── Filter Modal (bottom sheet) ───────────────────────────────────────────────
