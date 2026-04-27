@@ -10,11 +10,15 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { colors } from '../../constants/colors';
 import { supabase } from '../../lib/supabase';
+import { completePendingSignupExperience } from '../../lib/signupRecovery';
 
 const MONO = Platform.select({ ios: 'Courier New', android: 'monospace' }) as string;
+const AUTH_LABEL = '#9a9a9a';
+const AUTH_PLACEHOLDER = '#7a7a7a';
 
 function WOALogo() {
   return (
@@ -35,19 +39,21 @@ const logo = StyleSheet.create({
   box: {
     borderWidth: 1,
     borderColor: colors.white,
-    width: 110,
-    height: 110,
+    width: 124,
+    height: 124,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  text: { color: colors.white, fontFamily: MONO, fontSize: 12, letterSpacing: 0.25 },
+  text: { color: colors.white, fontFamily: MONO, fontSize: 13, letterSpacing: 0.25 },
   bottomRow: { flexDirection: 'row', alignItems: 'center' },
-  dot: { color: colors.red, fontSize: 12 },
+  dot: { color: colors.red, fontSize: 13 },
 });
 
 interface Props { navigation: any }
 
 export default function LoginScreen({ navigation }: Props) {
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -60,6 +66,7 @@ export default function LoginScreen({ navigation }: Props) {
     try {
       const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
       if (loginError) { setError(loginError.message.toUpperCase()); return; }
+      await completePendingSignupExperience();
       navigation.replace('Main');
     } catch (e: any) {
       setError(e.message?.toUpperCase() ?? 'SOMETHING WENT WRONG.');
@@ -85,7 +92,8 @@ export default function LoginScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={s.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[s.scroll, isTablet && s.scrollTablet]} keyboardShouldPersistTaps="handled">
+          <View style={[s.formInner, isTablet && s.formInnerTablet]}>
           <WOALogo />
 
           <View style={s.fieldWrap}>
@@ -96,7 +104,7 @@ export default function LoginScreen({ navigation }: Props) {
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
-              placeholderTextColor={colors.gray5}
+              placeholderTextColor={AUTH_PLACEHOLDER}
               autoCorrect={false}
             />
           </View>
@@ -109,7 +117,7 @@ export default function LoginScreen({ navigation }: Props) {
               onChangeText={setPassword}
               secureTextEntry
               autoCapitalize="none"
-              placeholderTextColor={colors.gray5}
+              placeholderTextColor={AUTH_PLACEHOLDER}
             />
           </View>
 
@@ -129,6 +137,7 @@ export default function LoginScreen({ navigation }: Props) {
               <Text style={s.signupBold}>SIGN UP</Text>
             </Text>
           </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -138,18 +147,21 @@ export default function LoginScreen({ navigation }: Props) {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.black },
   scroll: { paddingHorizontal: 28, paddingTop: 60, paddingBottom: 60 },
+  scrollTablet: { paddingHorizontal: 48, paddingTop: 72, paddingBottom: 96, alignItems: 'center' },
+  formInner: { width: '100%' },
+  formInnerTablet: { maxWidth: 620 },
   fieldWrap: { marginBottom: 26 },
-  label: { color: colors.gray5, fontFamily: MONO, fontSize: 11, letterSpacing: 0.18, marginBottom: 8 },
+  label: { color: AUTH_LABEL, fontFamily: MONO, fontSize: 12, letterSpacing: 0.18, marginBottom: 8 },
   input: {
     color: colors.white,
     fontFamily: MONO,
-    fontSize: 15,
+    fontSize: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     paddingVertical: 8,
     letterSpacing: 0.12,
   },
-  errorText: { color: colors.red, fontFamily: MONO, fontSize: 11, letterSpacing: 0.18, marginBottom: 16 },
+  errorText: { color: colors.red, fontFamily: MONO, fontSize: 12, letterSpacing: 0.16, marginBottom: 16 },
   btn: {
     borderWidth: 1,
     borderColor: colors.white,
@@ -158,10 +170,10 @@ const s = StyleSheet.create({
     marginTop: 8,
     marginBottom: 24,
   },
-  btnText: { color: colors.white, fontFamily: MONO, fontSize: 13, letterSpacing: 0.22 },
+  btnText: { color: colors.white, fontFamily: MONO, fontSize: 14, letterSpacing: 0.2 },
   forgotRow: { alignItems: 'center', marginBottom: 32 },
-  forgotText: { color: colors.gray5, fontFamily: MONO, fontSize: 11, letterSpacing: 0.2 },
+  forgotText: { color: AUTH_LABEL, fontFamily: MONO, fontSize: 12, letterSpacing: 0.18 },
   signupRow: { alignItems: 'center' },
-  signupText: { color: colors.gray5, fontFamily: MONO, fontSize: 11, letterSpacing: 0.15 },
+  signupText: { color: AUTH_LABEL, fontFamily: MONO, fontSize: 12, letterSpacing: 0.12 },
   signupBold: { color: colors.white },
 });

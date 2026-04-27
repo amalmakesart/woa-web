@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { navigate } from '../lib/navigationRef';
+import { registerForPushNotifications } from '../lib/pushNotifications';
 
 export interface BannerData {
+  id?: string;
   actorName: string;
   actorAvatar: string | null;
   text: string;
@@ -42,6 +44,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
   const isGigPosterRef = useRef<boolean>(false);
   const userIdRef = useRef<string | null>(null);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recentBannerKeysRef = useRef<Map<string, number>>(new Map());
 
   const refreshUnread = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -79,18 +82,34 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const showBanner = useCallback(async (notif: any) => {
+    const bannerKey = [
+      notif.type ?? '',
+      notif.actor_id ?? '',
+      notif.reference_id ?? '',
+      notif.reference_type ?? '',
+      notif.preview_text ?? '',
+    ].join('|');
+    const lastShownAt = recentBannerKeysRef.current.get(bannerKey) ?? 0;
+    if (Date.now() - lastShownAt < 15000) return;
+    recentBannerKeysRef.current.set(bannerKey, Date.now());
+
     // Don't banner for messages if already in that conversation
     if (notif.type === 'new_message' &&
         notif.reference_id === activeConversationId) return;
 
+    const actorProfileId =
+      notif.type === 'new_follower'
+        ? (notif.actor_id ?? notif.reference_id ?? null)
+        : (notif.actor_id ?? null);
+
     // Fetch actor profile
-    let actorName = 'SOMEONE';
+    let actorName = notif.reference_type === 'welcome' ? 'WOA' : 'SOMEONE';
     let actorAvatar: string | null = null;
-    if (notif.actor_id) {
+    if (actorProfileId) {
       const { data: actor } = await supabase
         .from('profiles')
         .select('username, full_name, profile_photo_url')
-        .eq('id', notif.actor_id)
+        .eq('id', actorProfileId)
         .maybeSingle();
       if (actor) {
         actorName = `@${((actor as any).username ?? (actor as any).full_name ?? 'UNKNOWN').toUpperCase()}`;
@@ -104,13 +123,25 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
 
     switch (notif.type) {
       case 'new_message':
-        text = `${actorName} SENT YOU A MESSAGE`;
-        screen = 'Inbox';
+        text = notif.reference_type === 'welcome'
+          ? 'WOA SENT YOU A WELCOME MESSAGE'
+          : `${actorName} SENT YOU A MESSAGE`;
+        if (notif.reference_type === 'welcome') {
+          screen = 'WelcomeMessage';
+          params = { body: notif.preview_text ?? '' };
+        } else {
+          screen = 'Inbox';
+        }
         break;
       case 'new_follower':
         text = `${actorName} STARTED FOLLOWING YOU`;
         screen = 'ArtistProfile';
-        params = { userId: notif.actor_id };
+        params = { userId: actorProfileId };
+        break;
+      case 'co_post_invite':
+        text = `${actorName} CO-POSTED WITH YOU`;
+        screen = 'PostDetail';
+        params = notif.reference_id ? { postId: notif.reference_id } : {};
         break;
       case 'post_liked':
         text = `${actorName} LIKED YOUR POST`;
@@ -132,12 +163,22 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
         screen = 'GigDetail';
         params = { gigId: notif.reference_id };
         break;
+      case 'project_comment':
+        text = `${actorName} COMMENTED ON YOUR PROJECT`;
+        screen = 'ProjectDetail';
+        params = { projectId: notif.reference_id };
+        break;
+      case 'booking_confirmed':
+        text = `${actorName} CONFIRMED A BOOKING`;
+        screen = 'Inbox';
+        params = {};
+        break;
     }
 
     if (!text) return;
 
     if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
-    setBanner({ actorName, actorAvatar, text, screen, params });
+    setBanner({ id: bannerKey, actorName, actorAvatar, text, screen, params });
     bannerTimerRef.current = setTimeout(() => setBanner(null), 3500);
   }, [activeConversationId]);
 
@@ -149,6 +190,28 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     refreshUnread();
     refreshNotifications();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        userIdRef.current = session.user.id;
+      } else {
+        userIdRef.current = null;
+      }
+
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (session?.user) {
+          await registerForPushNotifications(session.user.id);
+        }
+        await refreshUnread();
+        await refreshNotifications();
+      }
+
+      if (event === 'SIGNED_OUT') {
+        setUnreadCount(0);
+        setNotifCount(0);
+        setBanner(null);
+      }
+    });
 
     const msgChannel = supabase
       .channel('global_conv_watch')
@@ -169,6 +232,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       .subscribe();
 
     return () => {
+      authListener.subscription.unsubscribe();
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(notifChannel);
       if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);

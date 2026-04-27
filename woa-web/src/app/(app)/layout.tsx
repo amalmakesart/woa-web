@@ -1,5 +1,6 @@
 import { Sidebar } from '@/components/Sidebar'
 import { BottomNav } from '@/components/BottomNav'
+import { FloatingAppButton } from '@/components/FloatingAppButton'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -25,6 +26,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="md-bottom-nav">
         <BottomNav />
       </div>
+
+      <FloatingAppButton />
 
       <style>{`
         @media (min-width: 768px) {

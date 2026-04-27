@@ -93,6 +93,9 @@ export default function ConversationScreen() {
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [showGigBanner, setShowGigBanner] = useState(!!gigId);
+  const [bookingStatus, setBookingStatus] = useState<'none' | 'in_process' | 'agreement_reached' | 'booked'>('none');
+  const [bookedAt, setBookedAt] = useState<string | null>(null);
+  const [conversationArtistId, setConversationArtistId] = useState<string | null>(null);
 
   const markAsRead = useCallback(async (uid: string, role: string) => {
     const isGigPoster = role === 'GIG_POSTER';
@@ -127,6 +130,21 @@ export default function ConversationScreen() {
       .order('created_at', { ascending: true });
 
     setMessages((msgData as Message[]) ?? []);
+
+    // Load booking status for gig conversations
+    if (gigId) {
+      const { data: convData } = await supabase
+        .from('conversations')
+        .select('booking_status, booked_at, artist_id')
+        .eq('id', conversationId)
+        .maybeSingle();
+      if (convData) {
+        setBookingStatus((convData as any).booking_status ?? 'none');
+        setBookedAt((convData as any).booked_at ?? null);
+        setConversationArtistId((convData as any).artist_id ?? null);
+      }
+    }
+
     setLoading(false);
 
     if (role) await markAsRead(user.id, role);
@@ -310,6 +328,64 @@ export default function ConversationScreen() {
         </View>
       ) : null}
 
+      {/* BOOKING STATUS BAR — gig conversations only */}
+      {gigId ? (
+        <View style={s.bookingBar}>
+          {(['in_process', 'agreement_reached', 'booked'] as const).map((status, idx) => {
+            const labels: Record<string, string> = {
+              in_process: 'IN PROCESS',
+              agreement_reached: 'AGREED',
+              booked: 'BOOKED',
+            };
+            const isActive = bookingStatus === status;
+            const isPast = (
+              (status === 'in_process' && (bookingStatus === 'agreement_reached' || bookingStatus === 'booked')) ||
+              (status === 'agreement_reached' && bookingStatus === 'booked')
+            );
+            const isGigPoster = currentUserRole === 'GIG_POSTER';
+            return (
+              <React.Fragment key={status}>
+                {idx > 0 && <Text style={s.bookingArrow}>›</Text>}
+                <TouchableOpacity
+                  style={[s.bookingStep, (isActive || isPast) && s.bookingStepDone]}
+                  onPress={async () => {
+                    if (!isGigPoster || isActive || isPast) return;
+                    const updates: Record<string, string | null> = { booking_status: status };
+                    if (status === 'booked') updates.booked_at = new Date().toISOString();
+                    await supabase.from('conversations').update(updates).eq('id', conversationId);
+                    setBookingStatus(status);
+                    if (status === 'booked') setBookedAt(new Date().toISOString());
+                  }}
+                  activeOpacity={isGigPoster && !isActive && !isPast ? 0.7 : 1}
+                >
+                  <Text style={[s.bookingStepText, (isActive || isPast) && s.bookingStepTextDone]}>
+                    {labels[status]}
+                  </Text>
+                </TouchableOpacity>
+              </React.Fragment>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {/* Review prompt — 1 week after booked */}
+      {gigId && bookingStatus === 'booked' && bookedAt && conversationArtistId && currentUserId &&
+        (Date.now() - new Date(bookedAt).getTime() >= 7 * 24 * 60 * 60 * 1000) ? (
+        <TouchableOpacity
+          style={s.reviewPrompt}
+          onPress={() => navigation.navigate('LeaveReview', {
+            gigId,
+            gigTitle,
+            revieweeId: currentUserRole === 'GIG_POSTER' ? conversationArtistId : otherUserId,
+            revieweeName: currentUserRole === 'GIG_POSTER' ? otherUserName : otherUserName,
+            revieweeAvatar: otherUserAvatar,
+          })}
+          activeOpacity={0.8}
+        >
+          <Text style={s.reviewPromptText}>⭐ LEAVE A REVIEW FOR THIS GIG</Text>
+        </TouchableOpacity>
+      ) : null}
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -383,9 +459,9 @@ const s = StyleSheet.create({
   backBtn: { padding: 4 },
   backArrow: { color: colors.white, fontFamily: MONO, fontSize: 28, lineHeight: 32 },
   topBarCenter: { flex: 1 },
-  topBarName: { color: colors.white, fontFamily: MONO, fontSize: 9, letterSpacing: 0.18 },
-  topBarHandle: { color: colors.red, fontFamily: MONO, fontSize: 7, letterSpacing: 0.12, marginTop: 2 },
-  topBarGig: { color: '#444444', fontFamily: MONO, fontSize: 6, letterSpacing: 0.1, marginTop: 2 },
+  topBarName: { color: colors.white, fontFamily: MONO, fontSize: 12, letterSpacing: 0.18 },
+  topBarHandle: { color: colors.red, fontFamily: MONO, fontSize: 10, letterSpacing: 0.12, marginTop: 2 },
+  topBarGig: { color: '#9a9a9a', fontFamily: MONO, fontSize: 10, letterSpacing: 0.1, marginTop: 2 },
 
   gigBanner: {
     flexDirection: 'row', alignItems: 'center',
@@ -393,8 +469,29 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: colors.red,
     paddingHorizontal: 16, paddingVertical: 8,
   },
-  gigBannerText: { color: colors.red, fontFamily: MONO, fontSize: 7, letterSpacing: 0.12 },
+  gigBannerText: { color: colors.red, fontFamily: MONO, fontSize: 10, letterSpacing: 0.12 },
   gigBannerClose: { color: colors.red, fontFamily: MONO, fontSize: 16, paddingLeft: 12 },
+
+  bookingBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#050505',
+    borderBottomWidth: 1, borderBottomColor: '#111111',
+    paddingHorizontal: 16, paddingVertical: 10, gap: 4,
+  },
+  bookingArrow: { color: '#333333', fontFamily: MONO, fontSize: 12 },
+  bookingStep: {
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderWidth: 1, borderColor: '#222222',
+  },
+  bookingStepDone: { borderColor: '#f6c55a', backgroundColor: '#0a0800' },
+  bookingStepText: { color: '#9a9a9a', fontFamily: MONO, fontSize: 9, letterSpacing: 0.15 },
+  bookingStepTextDone: { color: '#f6c55a' },
+
+  reviewPrompt: {
+    backgroundColor: '#0a0000', borderBottomWidth: 1, borderBottomColor: colors.red,
+    paddingHorizontal: 16, paddingVertical: 10,
+  },
+  reviewPromptText: { color: colors.red, fontFamily: MONO, fontSize: 10, letterSpacing: 0.15, textAlign: 'center' },
 
   listContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
 
@@ -403,17 +500,13 @@ const s = StyleSheet.create({
     marginVertical: 14, gap: 8,
   },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#111111' },
-  dividerLabel: { color: '#333333', fontFamily: MONO, fontSize: 6, letterSpacing: 0.15 },
+  dividerLabel: { color: '#9a9a9a', fontFamily: MONO, fontSize: 10, letterSpacing: 0.15 },
 
   bubbleWrap: { marginBottom: 8 },
   bubbleWrapRight: { alignItems: 'flex-end' },
   bubbleWrapLeft: { alignItems: 'flex-start' },
 
-  bubble: {
-    maxWidth: BUBBLE_MAX,
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderWidth: 1,
-  },
+  bubble: { maxWidth: BUBBLE_MAX, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1 },
   bubbleOwn: {
     backgroundColor: '#1a1a1a',
     borderColor: '#2a2a2a',
@@ -426,24 +519,24 @@ const s = StyleSheet.create({
     borderRadius: 12,
     borderBottomLeftRadius: 2,
   },
-  bubbleText: { fontFamily: MONO, fontSize: 9, letterSpacing: 0.08, lineHeight: 14 },
+  bubbleText: { fontFamily: MONO, fontSize: 13, letterSpacing: 0.08, lineHeight: 20 },
   bubbleTextOwn: { color: colors.white },
   bubbleTextOther: { color: '#cccccc' },
 
-  bubbleTime: { fontFamily: MONO, fontSize: 6, color: '#333333', marginTop: 3, letterSpacing: 0.1 },
+  bubbleTime: { fontFamily: MONO, fontSize: 10, color: '#9a9a9a', marginTop: 4, letterSpacing: 0.1 },
   timeRight: { textAlign: 'right' },
   timeLeft: { textAlign: 'left' },
 
   emptyMessages: { paddingTop: 80, alignItems: 'center', gap: 8 },
-  emptyTitle: { color: '#333333', fontFamily: MONO, fontSize: 9, letterSpacing: 0.2 },
-  emptySub: { color: '#1a1a1a', fontFamily: MONO, fontSize: 7, letterSpacing: 0.15 },
+  emptyTitle: { color: '#9a9a9a', fontFamily: MONO, fontSize: 11, letterSpacing: 0.2 },
+  emptySub: { color: '#9a9a9a', fontFamily: MONO, fontSize: 10, letterSpacing: 0.15 },
 
   inputArea: {
     borderTopWidth: 1, borderTopColor: '#111111',
     backgroundColor: colors.black,
   },
   inputError: {
-    color: colors.red, fontFamily: MONO, fontSize: 8, letterSpacing: 0.1,
+    color: colors.red, fontFamily: MONO, fontSize: 10, letterSpacing: 0.1,
     paddingHorizontal: 16, paddingTop: 8,
   },
   inputRow: {
@@ -455,12 +548,12 @@ const s = StyleSheet.create({
     backgroundColor: '#0a0a0a',
     borderWidth: 1, borderColor: '#1a1a1a', borderRadius: 8,
     color: colors.white, fontFamily: MONO,
-    fontSize: 9, letterSpacing: 0.06,
-    paddingHorizontal: 10, paddingVertical: 8,
-    maxHeight: 80,
+    fontSize: 13, letterSpacing: 0.06,
+    paddingHorizontal: 12, paddingVertical: 10,
+    maxHeight: 110,
   },
-  sendBtn: { paddingVertical: 8, minWidth: 36, alignItems: 'center' },
-  sendBtnText: { fontFamily: MONO, fontSize: 8, letterSpacing: 0.15 },
+  sendBtn: { paddingVertical: 8, minWidth: 44, alignItems: 'center' },
+  sendBtnText: { fontFamily: MONO, fontSize: 11, letterSpacing: 0.15 },
   sendActive: { color: colors.red },
   sendInactive: { color: '#333333' },
 });

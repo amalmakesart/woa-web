@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Read(//Users/alhomsiah/**)",
-      "Bash(npx create-expo-app:*)"
+      "Bash(npx create-expo-app:*)",
+      "Bash(npx create-next-app@latest:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(ls /Users/alhomsiah/workerofart/woa-web/next.config*)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(ls:*)"
     ]
   }
 }

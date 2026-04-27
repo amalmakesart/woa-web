@@ -17,6 +17,7 @@ interface Gig {
   title: string
   description: string | null
   art_type: string | null
+  image_url: string | null
   location: string | null
   date_timeframe: string | null
   budget_min: number | null
@@ -186,6 +187,7 @@ export default function GigsPage() {
   const [cityFilter, setCityFilter] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<'type' | 'country' | 'city' | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [showSignUp, setShowSignUp] = useState(false)
 
   const loadGigs = useCallback(async () => {
@@ -194,6 +196,10 @@ export default function GigsPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id ?? null)
+      if (user) {
+        const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        setCurrentUserRole((me as any)?.role ?? null)
+      }
 
       let query = supabase
         .from('gigs')
@@ -254,15 +260,15 @@ export default function GigsPage() {
       >
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.02em' }}>GIG BOARD</h1>
-          {currentUserId ? (
+          {currentUserId && currentUserRole === 'GIG_POSTER' ? (
             <Link href="/gigs/new" className="btn-red" style={{ fontSize: 10, padding: '6px 14px' }}>
               POST A GIG ↗
             </Link>
-          ) : (
+          ) : !currentUserId ? (
             <button onClick={() => setShowSignUp(true)} className="btn-red" style={{ fontSize: 10, padding: '6px 14px', cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}>
               POST A GIG ↗
             </button>
-          )}
+          ) : null}
         </div>
         <p style={{ fontSize: 11, color: '#f5c842', letterSpacing: '0.1em', marginBottom: 16 }}>
           HIRE ARTISTS FOR YOUR NEXT PROJECT, SHOOT, EVENT, OR CAMPAIGN.
@@ -311,82 +317,44 @@ export default function GigsPage() {
           {gigs.length === 0 ? 'NO OPEN GIGS' : 'NO MATCHING GIGS'}
         </div>
       ) : (
-        filteredGigs.map(gig => (
-          <Link
-            key={gig.id}
-            href={`/gigs/${gig.id}`}
-            style={{ textDecoration: 'none', display: 'block' }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'baseline',
-                justifyContent: 'space-between',
-                padding: '24px 0',
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
-                gap: 16,
-                cursor: 'pointer',
-                transition: 'padding-left 0.2s',
-              }}
-              className="gig-row-hover"
-            >
-              <div style={{ flex: 1 }}>
-                {gig.is_featured && (
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      fontSize: 9,
-                      color: '#c0392b',
-                      letterSpacing: '0.14em',
-                      border: '1px solid #c0392b',
-                      padding: '2px 6px',
-                      marginBottom: 8,
-                    }}
-                  >
-                    FEATURED
-                  </span>
-                )}
-                <span
-                  style={{
-                    display: 'block',
-                    fontSize: 16,
-                    fontWeight: 700,
-                    letterSpacing: '0.02em',
-                    lineHeight: 1.2,
-                    marginBottom: 8,
-                    color: '#fff',
-                  }}
-                >
-                  {gig.title}
-                </span>
-                <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.08em' }}>
-                  {[
-                    gig.company_name ?? gig.poster_name,
-                    gig.art_type,
-                    gig.location,
-                    gig.date_timeframe,
-                  ].filter(Boolean).join(' · ').toUpperCase()}
-                </span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+          {filteredGigs.map(gig => (
+            <Link key={gig.id} href={`/gigs/${gig.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+              <div style={{ border: '1px solid rgba(255,255,255,0.1)', background: '#0a0a0a', cursor: 'pointer', transition: 'border-color 0.2s' }} className="gig-card-hover">
+                {/* Image */}
+                {gig.image_url ? (
+                  <div style={{ position: 'relative', height: 160, overflow: 'hidden' }}>
+                    <img src={gig.image_url} alt={gig.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {gig.is_featured && (
+                      <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, color: '#f6c55a', background: 'rgba(0,0,0,0.75)', border: '1px solid #f6c55a', padding: '2px 7px', letterSpacing: '0.14em' }}>
+                        ★ FEATURED
+                      </span>
+                    )}
+                  </div>
+                ) : gig.is_featured ? (
+                  <div style={{ padding: '10px 16px 0' }}>
+                    <span style={{ fontSize: 9, color: '#f6c55a', border: '1px solid #f6c55a', padding: '2px 7px', letterSpacing: '0.14em' }}>★ FEATURED</span>
+                  </div>
+                ) : null}
+
+                {/* Body */}
+                <div style={{ padding: '14px 16px 16px' }}>
+                  <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.02em', color: '#fff', lineHeight: 1.3, marginBottom: 8 }}>{gig.title}</p>
+                  <p style={{ fontSize: 10, color: '#888880', letterSpacing: '0.06em', marginBottom: 12, lineHeight: 1.6 }}>
+                    {[gig.company_name ?? gig.poster_name, gig.art_type, gig.location].filter(Boolean).join(' · ').toUpperCase()}
+                  </p>
+                  {gig.date_timeframe && (
+                    <p style={{ fontSize: 10, color: '#666', letterSpacing: '0.06em', marginBottom: 12 }}>{gig.date_timeframe.toUpperCase()}</p>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{formatBudget(gig.budget_min, gig.budget_max)}</span>
+                    <span style={{ fontSize: 10, color: '#c0392b', letterSpacing: '0.08em' }}>{gig.interest_count} INTERESTED</span>
+                  </div>
+                </div>
               </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <span
-                  style={{
-                    display: 'block',
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: '#fff',
-                    marginBottom: 4,
-                  }}
-                >
-                  {formatBudget(gig.budget_min, gig.budget_max)}
-                </span>
-                <span style={{ fontSize: 10, color: '#c0392b', letterSpacing: '0.08em' }}>
-                  {gig.interest_count} INTERESTED
-                </span>
-              </div>
-            </div>
-          </Link>
-        ))
+            </Link>
+          ))}
+        </div>
       )}
 
       {showSignUp && (

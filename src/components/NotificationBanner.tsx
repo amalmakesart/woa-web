@@ -55,7 +55,7 @@ function BannerInner({ data, onDismiss }: BannerInnerProps) {
 export default function NotificationBanner() {
   const { banner, dismissBanner } = useUnread();
   if (!banner) return null;
-  return <BannerInner key={banner.text + banner.screen} data={banner} onDismiss={dismissBanner} />;
+  return <BannerInner key={banner.id ?? (banner.text + banner.screen)} data={banner} onDismiss={dismissBanner} />;
 }
 
 const s = StyleSheet.create({
@@ -83,12 +83,12 @@ const s = StyleSheet.create({
     flex: 1,
     color: '#ffffff',
     fontFamily: MONO,
-    fontSize: 8,
+    fontSize: 11,
     letterSpacing: 0.12,
-    lineHeight: 13,
+    lineHeight: 17,
   },
   close: {
-    color: '#555555',
+    color: '#9a9a9a',
     fontSize: 18,
     fontFamily: MONO,
   },

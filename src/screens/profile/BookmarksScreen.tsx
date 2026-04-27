@@ -180,7 +180,7 @@ const s = StyleSheet.create({
   topBarTitle: { flex: 1, textAlign: 'center', color: colors.white, fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
   emptyTitle: { color: colors.white, fontFamily: MONO, fontSize: 10, letterSpacing: 0.2 },
-  emptySub: { color: '#444444', fontFamily: MONO, fontSize: 8, letterSpacing: 0.12, textAlign: 'center', lineHeight: 14 },
+  emptySub: { color: '#8f8f8f', fontFamily: MONO, fontSize: 8, letterSpacing: 0.12, textAlign: 'center', lineHeight: 14 },
   grid: { flex: 1, backgroundColor: '#111111' },
   columnWrapper: { gap: 1, backgroundColor: '#111111' },
   rowSeparator: { height: 1, backgroundColor: '#111111' },

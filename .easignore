@@ -1,0 +1,9 @@
+.claude/
+app-store-shots/
+dist/
+docs/
+legal/
+node_modules/
+supabase/.temp/
+woa-web/
+workerofart-site/

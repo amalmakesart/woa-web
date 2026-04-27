@@ -212,8 +212,8 @@ export default function GigDetailPage() {
         </div>
       )}
 
-      {/* Express interest */}
-      {!isOwner && gig.status === 'active' && currentUserRole !== 'ART_LOVER' && (
+      {/* Express interest — only artists and collectives can apply */}
+      {!isOwner && gig.status === 'active' && (currentUserRole === 'ARTIST' || currentUserRole === 'COLLECTIVE' || (!currentUserId)) && (
         <div
           style={{
             border: '1px solid rgba(255,255,255,0.1)',

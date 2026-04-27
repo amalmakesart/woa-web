@@ -24,11 +24,11 @@ const s = StyleSheet.create({
   text: {
     color: colors.white,
     fontFamily: MONO,
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 0.2,
   },
   dot: {
     color: colors.red,
-    fontSize: 9,
+    fontSize: 11,
   },
 });

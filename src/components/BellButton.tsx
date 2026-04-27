@@ -16,7 +16,7 @@ export default function BellButton({ onPress }: BellButtonProps) {
       <Ionicons
         name={hasUnread ? 'notifications' : 'notifications-outline'}
         size={20}
-        color={hasUnread ? '#ffffff' : '#555555'}
+        color={hasUnread ? '#ffffff' : '#9a9a9a'}
       />
       {hasUnread ? (
         <View style={s.badge}>
@@ -30,7 +30,6 @@ export default function BellButton({ onPress }: BellButtonProps) {
 const s = StyleSheet.create({
   wrap: {
     position: 'relative',
-    marginRight: 10,
   },
   badge: {
     position: 'absolute',

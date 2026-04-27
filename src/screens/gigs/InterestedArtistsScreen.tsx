@@ -101,7 +101,7 @@ export default function InterestedArtistsScreen() {
     setMessagingArtistId(item.artist_id);
     const convId = await findOrCreateConversation(currentUserId, item.artist_id, gigId);
     setMessagingArtistId(null);
-    if (!convId) { Alert.alert('ERROR', 'Could not open conversation.'); return; }
+    if (!convId) { Alert.alert('UNAVAILABLE', 'You can only message artists who have expressed interest in this gig.'); return; }
     navigation.navigate('Conversation', {
       conversationId: convId,
       otherUserId: item.artist_id,
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 6 },
   backArrow: { color: colors.white, fontFamily: MONO, fontSize: 28, lineHeight: 32 },
-  backLabel: { color: '#666666', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
+  backLabel: { color: '#9a9a9a', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   notifDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.red },
 
@@ -229,10 +229,10 @@ const styles = StyleSheet.create({
     color: colors.white, fontFamily: MONO, fontSize: 13, letterSpacing: 0.3,
   },
   headerSub: {
-    color: '#555555', fontFamily: MONO, fontSize: 7, letterSpacing: 0.12, marginTop: 4,
+    color: '#9a9a9a', fontFamily: MONO, fontSize: 11, letterSpacing: 0.12, marginTop: 4,
   },
   headerCount: {
-    color: colors.red, fontFamily: MONO, fontSize: 7, letterSpacing: 0.15, marginTop: 6,
+    color: colors.red, fontFamily: MONO, fontSize: 11, letterSpacing: 0.15, marginTop: 6,
   },
 
   row: {
@@ -243,30 +243,30 @@ const styles = StyleSheet.create({
   },
   rowInfo: { flex: 1 },
   artistName: {
-    color: colors.white, fontFamily: MONO, fontSize: 8, letterSpacing: 0.15, marginBottom: 4,
+    color: colors.white, fontFamily: MONO, fontSize: 12, letterSpacing: 0.15, marginBottom: 4,
   },
   metaRow: { flexDirection: 'row', gap: 8, marginBottom: 6 },
-  artType: { color: colors.red, fontFamily: MONO, fontSize: 6, letterSpacing: 0.12 },
-  city: { color: '#444444', fontFamily: MONO, fontSize: 6, letterSpacing: 0.1 },
+  artType: { color: colors.red, fontFamily: MONO, fontSize: 11, letterSpacing: 0.12 },
+  city: { color: '#9a9a9a', fontFamily: MONO, fontSize: 11, letterSpacing: 0.1 },
   notePreview: {
-    color: '#555555', fontFamily: MONO, fontSize: 6, letterSpacing: 0.08, lineHeight: 10,
+    color: '#9a9a9a', fontFamily: MONO, fontSize: 11, letterSpacing: 0.08, lineHeight: 17,
     fontStyle: 'italic',
   },
 
   rowRight: { alignItems: 'flex-end', justifyContent: 'flex-start', gap: 4, minWidth: 70 },
   fee: { color: colors.red, fontFamily: MONO, fontSize: 14, letterSpacing: 0.1 },
-  feeLabel: { color: '#333333', fontFamily: MONO, fontSize: 6, letterSpacing: 0.12 },
+  feeLabel: { color: '#8f8f8f', fontFamily: MONO, fontSize: 11, letterSpacing: 0.12 },
   messageBtn: {
     borderWidth: 1, borderColor: colors.red,
     paddingHorizontal: 8, paddingVertical: 5, marginTop: 6,
   },
   messageBtnBusy: { borderColor: '#333333' },
-  messageBtnText: { color: colors.red, fontFamily: MONO, fontSize: 6, letterSpacing: 0.15 },
+  messageBtnText: { color: colors.red, fontFamily: MONO, fontSize: 11, letterSpacing: 0.15 },
 
   emptyText: {
-    color: '#444444', fontFamily: MONO, fontSize: 9, letterSpacing: 0.2, marginBottom: 6,
+    color: '#9a9a9a', fontFamily: MONO, fontSize: 11, letterSpacing: 0.2, marginBottom: 6,
   },
   emptySubText: {
-    color: '#2a2a2a', fontFamily: MONO, fontSize: 7, letterSpacing: 0.15,
+    color: '#8f8f8f', fontFamily: MONO, fontSize: 11, letterSpacing: 0.15, lineHeight: 17,
   },
 });

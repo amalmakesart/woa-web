@@ -359,7 +359,7 @@ const s = StyleSheet.create({
   },
   backBtn: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 6 },
   backArrow: { color: colors.white, fontFamily: MONO, fontSize: 28, lineHeight: 32 },
-  backLabel: { color: '#666666', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
+  backLabel: { color: '#9a9a9a', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   notifDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.red },
   deleteBtn: { color: colors.red, fontFamily: MONO, fontSize: 9, letterSpacing: 0.2 },
@@ -379,7 +379,7 @@ const s = StyleSheet.create({
     color: colors.white, fontFamily: MONO,
     fontSize: 14, letterSpacing: 0.14, lineHeight: 20, marginBottom: 4,
   },
-  durationText: { color: '#444444', fontFamily: MONO, fontSize: 9, letterSpacing: 0.1, marginBottom: 12 },
+  durationText: { color: '#9a9a9a', fontFamily: MONO, fontSize: 9, letterSpacing: 0.1, marginBottom: 12 },
 
   watchBtn: {
     borderWidth: 1, borderColor: colors.red,
@@ -390,20 +390,20 @@ const s = StyleSheet.create({
   artistRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 10 },
   artistLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   artistHandle: { color: colors.red, fontFamily: MONO, fontSize: 10, letterSpacing: 0.12 },
-  artistType: { color: '#444444', fontFamily: MONO, fontSize: 8, letterSpacing: 0.1 },
+  artistType: { color: '#9a9a9a', fontFamily: MONO, fontSize: 8, letterSpacing: 0.1 },
   followBtn: { borderWidth: 1, borderColor: colors.white, paddingHorizontal: 10, paddingVertical: 4 },
   followBtnDone: { borderColor: '#333333' },
   followBtnText: { color: colors.white, fontFamily: MONO, fontSize: 8, letterSpacing: 0.15 },
   followBtnTextDone: { color: '#333333' },
 
   description: {
-    color: '#666666', fontFamily: MONO,
+    color: '#9a9a9a', fontFamily: MONO,
     fontSize: 10, letterSpacing: 0.06, lineHeight: 16, marginBottom: 12,
   },
 
   actionsRow: { flexDirection: 'row', alignItems: 'center' },
   actionBtn: { marginRight: 16 },
-  actionText: { color: '#444444', fontFamily: MONO, fontSize: 11 },
+  actionText: { color: '#9a9a9a', fontFamily: MONO, fontSize: 11 },
   actionTextLiked: { color: colors.red },
   reportBtn: { marginLeft: 'auto' as any },
   reportText: { color: colors.red, fontFamily: MONO, fontSize: 8, letterSpacing: 0.18 },
@@ -411,7 +411,7 @@ const s = StyleSheet.create({
   commentsSection: { paddingHorizontal: 16, paddingTop: 14 },
   commentsLabel: { color: '#333333', fontFamily: MONO, fontSize: 8, letterSpacing: 0.15, marginBottom: 10 },
   commentRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  commentUser: { color: '#555555', fontFamily: MONO, fontSize: 9, letterSpacing: 0.1, marginBottom: 2 },
+  commentUser: { color: '#9a9a9a', fontFamily: MONO, fontSize: 9, letterSpacing: 0.1, marginBottom: 2 },
   commentContent: { color: '#888888', fontFamily: MONO, fontSize: 10, letterSpacing: 0.06, lineHeight: 15 },
   noComments: { color: '#2a2a2a', fontFamily: MONO, fontSize: 9, letterSpacing: 0.12, marginBottom: 10 },
 

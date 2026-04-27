@@ -9,6 +9,7 @@ import { colors } from '../../constants/colors';
 import { supabase } from '../../lib/supabase';
 import OctagonalImage from '../../components/OctagonalImage';
 import { Post } from '../../components/PostCard';
+import VideoThumbnail from '../../components/VideoThumbnail';
 
 const MONO = Platform.select({ ios: 'Courier New', android: 'monospace' }) as string;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -41,6 +42,17 @@ function PostThumb({ post, onPress, onLongPress }: {
           <Text style={th.tag}>♪</Text>
         </View>
       )}
+      {post.type === 'video' && (
+        <VideoThumbnail
+          uri={post.media_url}
+          label="VIDEO"
+          cornerTag="▶"
+          containerStyle={th.videoBg}
+          centerPlayStyle={th.videoPlay}
+          labelStyle={th.videoLabel}
+          cornerTagStyle={th.tag}
+        />
+      )}
     </TouchableOpacity>
   );
 }
@@ -53,8 +65,11 @@ const th = StyleSheet.create({
   textContent: { color: colors.white, fontFamily: MONO, fontSize: 8, textAlign: 'center', letterSpacing: 0.05, lineHeight: 12 },
   audioBg: { width: '100%', height: '100%', backgroundColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', gap: 8 },
   triangle: { color: colors.red, fontSize: 18 },
+  videoBg: { width: '100%', height: '100%' },
+  videoPlay: { color: colors.white, fontSize: 18 },
   waveRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   wave: { width: 3, backgroundColor: colors.red, borderRadius: 1, opacity: 0.6 },
+  videoLabel: { color: '#ffffff', fontFamily: MONO, fontSize: 9, letterSpacing: 0.1 },
   tag: { position: 'absolute', top: 5, right: 6, color: colors.red, fontFamily: MONO, fontSize: 7 },
 });
 
@@ -74,12 +89,34 @@ export default function MyPostsScreen() {
     const { data: me } = await supabase.from('profiles').select('profile_photo_url').eq('id', user.id).single();
     if (me) setCurrentUserAvatar((me as any).profile_photo_url ?? null);
 
-    const { data } = await supabase
+    const { data: ownedPosts } = await supabase
       .from('posts')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
-    if (data) setPosts(data as Post[]);
+
+    const { data: collaboratorRows } = await supabase
+      .from('post_collaborators')
+      .select('post_id')
+      .eq('collaborator_id', user.id)
+      .eq('accepted', true);
+
+    const collaboratorPostIds = [...new Set((collaboratorRows ?? []).map((row: any) => row.post_id as string))]
+      .filter((id) => !(ownedPosts ?? []).some((post: any) => post.id === id));
+
+    let collaboratorPosts: any[] = [];
+    if (collaboratorPostIds.length > 0) {
+      const { data: extraPosts } = await supabase
+        .from('posts')
+        .select('*')
+        .in('id', collaboratorPostIds)
+        .order('created_at', { ascending: false });
+      collaboratorPosts = extraPosts ?? [];
+    }
+
+    const allPosts = [...(ownedPosts ?? []), ...collaboratorPosts]
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    setPosts(allPosts as Post[]);
     setLoading(false);
   }, []);
 
@@ -188,10 +225,10 @@ const s = StyleSheet.create({
   },
   backBtn: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 6 },
   backArrow: { color: colors.white, fontFamily: MONO, fontSize: 28, lineHeight: 32 },
-  backLabel: { color: '#666666', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
-  postCount: { color: '#444444', fontFamily: MONO, fontSize: 6, letterSpacing: 0.15 },
+  backLabel: { color: '#9a9a9a', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
+  postCount: { color: '#8f8f8f', fontFamily: MONO, fontSize: 6, letterSpacing: 0.15 },
   columnWrapper: { gap: 1 },
-  emptyText: { color: '#444444', fontFamily: MONO, fontSize: 9, letterSpacing: 0.2 },
+  emptyText: { color: '#8f8f8f', fontFamily: MONO, fontSize: 9, letterSpacing: 0.2 },
   newPostBtn: {
     borderWidth: 1, borderColor: colors.red,
     paddingHorizontal: 16, paddingVertical: 10,

@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../constants/colors';
-import { supabase } from '../../lib/supabase';
+import { clearLocalSupabaseSession, supabase } from '../../lib/supabase';
 
 const MONO = Platform.select({ ios: 'Courier New', android: 'monospace' }) as string;
 
@@ -47,19 +47,30 @@ export default function DeleteAccountScreen() {
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setDeleting(false); return; }
+    if (!user) {
+      setDeleting(false);
+      Alert.alert('ERROR', 'COULD NOT VERIFY YOUR ACCOUNT. PLEASE TRY AGAIN.');
+      return;
+    }
 
-    // Delete user data
-    await supabase.from('posts').delete().eq('user_id', user.id);
-    await supabase.from('follows').delete().eq('follower_id', user.id);
-    await supabase.from('follows').delete().eq('following_id', user.id);
-    await supabase.from('gig_interests').delete().eq('artist_id', user.id);
-    await supabase.from('profiles').delete().eq('id', user.id);
+    const { error: deleteError } = await supabase.functions.invoke('delete-account', {
+      body: {},
+    });
 
-    await supabase.auth.signOut();
+    if (deleteError) {
+      setDeleting(false);
+      Alert.alert('DELETE FAILED', 'WE COULD NOT DELETE YOUR ACCOUNT RIGHT NOW. PLEASE TRY AGAIN.');
+      return;
+    }
+
+    await clearLocalSupabaseSession();
     setDeleting(false);
-
-    navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
+    Alert.alert('ACCOUNT DELETED', 'YOUR WORK(ER) OF ART ACCOUNT HAS BEEN PERMANENTLY DELETED.', [
+      {
+        text: 'OK',
+        onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] }),
+      },
+    ]);
   };
 
   return (
@@ -207,7 +218,7 @@ const s = StyleSheet.create({
   },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   backArrow: { color: colors.white, fontFamily: MONO, fontSize: 28, lineHeight: 32 },
-  backLabel: { color: '#666666', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
+  backLabel: { color: '#9a9a9a', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
 
   stepWrap: { paddingHorizontal: 16, paddingTop: 30, alignItems: 'center' },
 
@@ -224,8 +235,8 @@ const s = StyleSheet.create({
     fontSize: 12, letterSpacing: 0.3, marginBottom: 12,
   },
   warningSubtitle: {
-    color: '#555555', fontFamily: MONO,
-    fontSize: 8, letterSpacing: 0.1, lineHeight: 14,
+    color: '#9a9a9a', fontFamily: MONO,
+    fontSize: 11, letterSpacing: 0.1, lineHeight: 18,
     textAlign: 'center', marginBottom: 24,
   },
 
@@ -236,16 +247,16 @@ const s = StyleSheet.create({
   },
   warningBoxTitle: {
     color: colors.red, fontFamily: MONO,
-    fontSize: 7, letterSpacing: 0.2, marginBottom: 12,
+    fontSize: 11, letterSpacing: 0.2, marginBottom: 12,
   },
   warningItem: { flexDirection: 'row', gap: 8, marginBottom: 6 },
-  warningDash: { color: '#5a1515', fontFamily: MONO, fontSize: 8 },
-  warningItemText: { color: '#888888', fontFamily: MONO, fontSize: 8, letterSpacing: 0.1 },
+  warningDash: { color: '#a33a3a', fontFamily: MONO, fontSize: 11 },
+  warningItemText: { color: '#b5b5b5', fontFamily: MONO, fontSize: 11, letterSpacing: 0.1, lineHeight: 17 },
 
   warningNote: {
-    color: '#444444', fontFamily: MONO,
-    fontSize: 6, letterSpacing: 0.1, textAlign: 'center',
-    marginBottom: 24, lineHeight: 11,
+    color: '#8f8f8f', fontFamily: MONO,
+    fontSize: 11, letterSpacing: 0.1, textAlign: 'center',
+    marginBottom: 24, lineHeight: 17,
   },
 
   continueBtn: {
@@ -253,33 +264,33 @@ const s = StyleSheet.create({
     height: 48, alignItems: 'center', justifyContent: 'center',
     marginBottom: 12,
   },
-  continueBtnText: { color: colors.red, fontFamily: MONO, fontSize: 9, letterSpacing: 0.25 },
+  continueBtnText: { color: colors.red, fontFamily: MONO, fontSize: 12, letterSpacing: 0.25 },
 
   cancelBtn: {
     width: '100%', borderWidth: 1, borderColor: '#222222',
     height: 48, alignItems: 'center', justifyContent: 'center',
   },
-  cancelBtnText: { color: '#444444', fontFamily: MONO, fontSize: 9, letterSpacing: 0.2 },
+  cancelBtnText: { color: '#9a9a9a', fontFamily: MONO, fontSize: 12, letterSpacing: 0.2 },
 
   confirmTitle: {
     color: colors.white, fontFamily: MONO,
     fontSize: 12, letterSpacing: 0.3, marginBottom: 10,
   },
   confirmSubtitle: {
-    color: '#555555', fontFamily: MONO,
-    fontSize: 7, letterSpacing: 0.1, lineHeight: 13,
+    color: '#9a9a9a', fontFamily: MONO,
+    fontSize: 11, letterSpacing: 0.1, lineHeight: 17,
     textAlign: 'center', marginBottom: 24,
   },
 
   field: { width: '100%', marginBottom: 20 },
-  fieldLabel: { color: '#888888', fontFamily: MONO, fontSize: 9, letterSpacing: 0.2, marginBottom: 10 },
+  fieldLabel: { color: '#b5b5b5', fontFamily: MONO, fontSize: 11, letterSpacing: 0.2, marginBottom: 10 },
   input: {
-    borderBottomWidth: 1, borderBottomColor: '#444444',
+    borderBottomWidth: 1, borderBottomColor: '#9a9a9a',
     color: '#ffffff', fontFamily: MONO, fontSize: 13,
     paddingBottom: 10,
   },
   inputMatch: { borderBottomColor: '#2a7a4f' },
-  fieldNote: { color: '#333333', fontFamily: MONO, fontSize: 6, letterSpacing: 0.1, marginTop: 6 },
+  fieldNote: { color: '#8f8f8f', fontFamily: MONO, fontSize: 11, letterSpacing: 0.1, marginTop: 6, lineHeight: 16 },
 
   privacyNote: {
     width: '100%', backgroundColor: '#050000',
@@ -287,8 +298,8 @@ const s = StyleSheet.create({
     padding: 14, marginBottom: 24,
   },
   privacyNoteText: {
-    color: '#333333', fontFamily: MONO,
-    fontSize: 6, letterSpacing: 0.1, lineHeight: 11, textAlign: 'center',
+    color: '#8f8f8f', fontFamily: MONO,
+    fontSize: 11, letterSpacing: 0.1, lineHeight: 17, textAlign: 'center',
   },
 
   deleteBtn: {
@@ -297,5 +308,5 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   deleteBtnDisabled: { opacity: 0.3 },
-  deleteBtnText: { color: colors.red, fontFamily: MONO, fontSize: 9, letterSpacing: 0.25 },
+  deleteBtnText: { color: colors.red, fontFamily: MONO, fontSize: 12, letterSpacing: 0.25 },
 });

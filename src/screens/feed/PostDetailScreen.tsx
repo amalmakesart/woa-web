@@ -10,6 +10,7 @@ import {
   Platform,
   SafeAreaView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors } from '../../constants/colors';
@@ -26,7 +27,7 @@ interface Comment {
   user_id: string;
   content: string;
   created_at: string;
-  profiles?: { username: string; profile_photo_url: string | null } | null;
+  profiles?: { username: string | null; profile_photo_url: string | null } | null;
 }
 
 function timeAgo(dateString: string): string {
@@ -60,6 +61,7 @@ export default function PostDetailScreen() {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState<boolean>(false);
+  const [isBookmarked, setIsBookmarked] = useState<boolean>(false);
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null);
   const [commentError, setCommentError] = useState<string | null>(null);
 
@@ -67,9 +69,7 @@ export default function PostDetailScreen() {
 
   useEffect(() => {
     const init = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       const uid = user?.id ?? null;
       setCurrentUserId(uid);
       currentUserIdRef.current = uid;
@@ -93,10 +93,13 @@ export default function PostDetailScreen() {
       if (postData) {
         const { data: postProfile } = await supabase
           .from('profiles')
-          .select('username, profile_photo_url, art_type, full_name')
+          .select('username, profile_photo_url, art_type, full_name, role')
           .eq('id', postData.user_id)
           .single();
-        setPost({ ...postData, profiles: postProfile ?? null } as Post);
+        setPost({
+          ...postData,
+          profiles: postProfile ?? null,
+        } as Post);
       }
 
       const { data: commentsData } = await supabase
@@ -114,7 +117,13 @@ export default function PostDetailScreen() {
         if (commentProfiles) {
           for (const p of commentProfiles) profileMap[p.id] = p;
         }
-        setComments(commentsData.map((c: any) => ({ ...c, profiles: profileMap[c.user_id] ?? null })) as Comment[]);
+        setComments(
+          commentsData.map((c: any) => ({
+            ...c,
+            content: c.content ?? c.body ?? '',
+            profiles: profileMap[c.user_id] ?? null,
+          })) as Comment[]
+        );
       }
 
       if (uid) {
@@ -125,6 +134,14 @@ export default function PostDetailScreen() {
           .eq('user_id', uid)
           .maybeSingle();
         setIsLiked(!!likeData);
+
+        const { data: bookmarkData } = await supabase
+          .from('bookmarks')
+          .select('id')
+          .eq('post_id', postId)
+          .eq('user_id', uid)
+          .maybeSingle();
+        setIsBookmarked(!!bookmarkData);
       }
 
       setLoading(false);
@@ -143,7 +160,7 @@ export default function PostDetailScreen() {
           filter: `post_id=eq.${postId}`,
         },
         async (payload) => {
-          const newRow = payload.new as Comment;
+          const newRow = payload.new as any;
           if (newRow.user_id === currentUserIdRef.current) return;
           const { data: commentRow } = await supabase
             .from('comments')
@@ -156,15 +173,16 @@ export default function PostDetailScreen() {
               .select('username, profile_photo_url')
               .eq('id', newRow.user_id)
               .single();
-            setComments((prev) => [...prev, { ...commentRow, profiles: p ?? null } as Comment]);
+            setComments((prev) => [
+              ...prev,
+              { ...commentRow, content: (commentRow as any).content ?? (commentRow as any).body ?? '', profiles: p ?? null } as Comment,
+            ]);
           }
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [postId]);
 
   const handleLike = async () => {
@@ -172,26 +190,59 @@ export default function PostDetailScreen() {
     const wasLiked = isLiked;
     setIsLiked(!wasLiked);
     setPost((prev) =>
-      prev
-        ? { ...prev, like_count: prev.like_count + (wasLiked ? -1 : 1) }
-        : prev
+      prev ? { ...prev, like_count: prev.like_count + (wasLiked ? -1 : 1) } : prev
     );
     if (wasLiked) {
-      await supabase
-        .from('likes')
-        .delete()
-        .match({ post_id: post.id, user_id: currentUserId });
+      await supabase.from('likes').delete().match({ post_id: post.id, user_id: currentUserId });
     } else {
-      await supabase
-        .from('likes')
-        .insert({ post_id: post.id, user_id: currentUserId });
+      await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
+      if (currentUserId !== post.user_id) {
+        await supabase.from('notifications').insert({
+          user_id: post.user_id,
+          type: 'post_liked',
+          actor_id: currentUserId,
+          reference_id: post.id,
+          reference_type: 'post',
+          preview_text: post.title ?? post.content?.slice(0, 40) ?? null,
+          is_read: false,
+        });
+      }
     }
   };
 
+  const handleBookmark = async () => {
+    if (!currentUserId || !post) return;
+    const wasBookmarked = isBookmarked;
+    setIsBookmarked(!wasBookmarked);
+
+    if (wasBookmarked) {
+      await supabase.from('bookmarks').delete().match({ post_id: post.id, user_id: currentUserId });
+      return;
+    }
+
+    const { error } = await supabase.from('bookmarks').insert({ post_id: post.id, user_id: currentUserId });
+    if (error) {
+      setIsBookmarked(false);
+      Alert.alert('SAVE FAILED', 'PLEASE TRY AGAIN.');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!post || currentUserId !== post.user_id) return;
+    await supabase.from('posts').delete().eq('id', post.id);
+    navigation.goBack();
+  };
+
   const handleSubmitComment = async () => {
-    if (!commentText.trim() || !currentUserId || !post) return;
-    const text = commentText.trim();
-    if (containsBannedWords(text)) {
+    if (!commentText.trim() || !post) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    const authorId = currentUserId ?? user?.id ?? null;
+    if (!authorId) {
+      setCommentError('FAILED TO POST COMMENT — NOT LOGGED IN');
+      return;
+    }
+    const content = commentText.trim();
+    if (containsBannedWords(content)) {
       setCommentError(getBannedWordError());
       return;
     }
@@ -199,45 +250,56 @@ export default function PostDetailScreen() {
     setCommentError(null);
     setCommentText('');
 
-    // Insert without join (FK relationship not defined in schema)
-    const { data: inserted, error } = await supabase
+    const { data: insertedRow, error: insertError } = await supabase
       .from('comments')
-      .insert({ post_id: post.id, user_id: currentUserId, content: text })
-      .select('*')
+      .insert({ post_id: post.id, user_id: authorId, content })
+      .select('id, post_id, user_id, content, created_at')
       .single();
 
-    if (error || !inserted) {
-      setCommentText(text);
-      setCommentError('FAILED TO POST COMMENT');
+    if (!insertedRow) {
+      setCommentText(content);
+      setCommentError(`FAILED TO POST COMMENT${insertError?.message ? ` — ${String(insertError.message).toUpperCase()}` : ''}`);
       setSubmitting(false);
       return;
     }
 
-    // Fetch the profile separately
     const { data: profile } = await supabase
       .from('profiles')
       .select('username, profile_photo_url')
-      .eq('id', currentUserId)
+      .eq('id', authorId)
       .single();
 
-    const newComment: Comment = {
-      ...inserted,
-      profiles: profile ?? null,
-    };
-
-    setComments((prev) => [...prev, newComment]);
-    setPost((prev) =>
-      prev ? { ...prev, comment_count: prev.comment_count + 1 } : prev
-    );
+    setComments((prev) => [
+      ...prev,
+      {
+        ...(insertedRow as any),
+        content: (insertedRow as any).content ?? content,
+        profiles: profile ?? null,
+      } as Comment,
+    ]);
+    setPost((prev) => prev ? { ...prev, comment_count: prev.comment_count + 1 } : prev);
+    try {
+      await supabase.rpc('increment_comment_count', { post_id: post.id });
+    } catch {
+      // Keep the new comment visible even if the aggregate counter RPC fails.
+    }
+    if (authorId !== post.user_id) {
+      await supabase.from('notifications').insert({
+        user_id: post.user_id,
+        type: 'post_comment',
+        actor_id: authorId,
+        reference_id: post.id,
+        reference_type: 'post',
+        preview_text: content.slice(0, 40),
+        is_read: false,
+      });
+    }
     setSubmitting(false);
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.backArrow}>←</Text>
@@ -259,32 +321,27 @@ export default function PostDetailScreen() {
               currentUserId={currentUserId}
               isLiked={isLiked}
               onPress={() => {}}
-              onAvatarPress={() =>
-                navigation.navigate('ArtistProfile', { userId: post.user_id })
-              }
+              onAvatarPress={() => navigation.navigate('ArtistProfile', { userId: post.user_id })}
               onLike={handleLike}
-              isBookmarked={false}
+              isBookmarked={isBookmarked}
+              onBookmark={handleBookmark}
+              onDelete={handleDelete}
+              onEdit={() => navigation.navigate('NewPost', { editPost: post })}
             />
           ) : null}
 
           <View style={styles.divider} />
-
           <Text style={styles.commentsLabel}>COMMENTS</Text>
 
           {comments.map((comment) => (
             <View key={comment.id} style={styles.commentRow}>
               <View style={styles.commentTopRow}>
-                <OctagonalImage
-                  size={24}
-                  imageUri={comment.profiles?.profile_photo_url ?? null}
-                />
+                <OctagonalImage size={32} imageUri={comment.profiles?.profile_photo_url ?? null} />
                 <View style={styles.commentMeta}>
                   <Text style={styles.commentUsername}>
                     {'@' + (comment.profiles?.username ?? '...')}
                   </Text>
-                  <Text style={styles.commentTime}>
-                    {timeAgo(comment.created_at)}
-                  </Text>
+              <Text style={styles.commentTime}>{timeAgo(comment.created_at)}</Text>
                 </View>
               </View>
               <Text style={styles.commentText}>{comment.content}</Text>
@@ -297,8 +354,9 @@ export default function PostDetailScreen() {
             <Text style={styles.commentErrorText}>{commentError}</Text>
           </View>
         ) : null}
+
         <View style={styles.inputRow}>
-          <OctagonalImage size={24} imageUri={currentUserAvatar} />
+          <OctagonalImage size={32} imageUri={currentUserAvatar} />
           <TextInput
             style={styles.commentInput}
             value={commentText}
@@ -308,11 +366,7 @@ export default function PostDetailScreen() {
             returnKeyType="send"
             onSubmitEditing={handleSubmitComment}
           />
-          <TouchableOpacity
-            onPress={handleSubmitComment}
-            disabled={submitting}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity onPress={handleSubmitComment} disabled={submitting} activeOpacity={0.7}>
             <Text style={styles.postButton}>POST</Text>
           </TouchableOpacity>
         </View>
@@ -322,13 +376,9 @@ export default function PostDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
-  keyboardAvoid: {
-    flex: 1,
-  },
+  safeArea: { flex: 1, backgroundColor: colors.black },
+  keyboardAvoid: { flex: 1 },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -337,94 +387,77 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#111111',
   },
-  backArrow: {
-    color: colors.white,
-    fontFamily: MONO,
-    fontSize: 28,
-    lineHeight: 32,
-  },
+  backArrow: { color: colors.white, fontFamily: MONO, fontSize: 28, lineHeight: 32 },
   headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    color: colors.white,
-    fontFamily: MONO,
-    fontSize: 13,
-    letterSpacing: 0.15,
+    flex: 1, textAlign: 'center',
+    color: colors.white, fontFamily: MONO, fontSize: 13, letterSpacing: 0.15,
   },
-  headerSpacer: {
-    width: 32,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  loadingContainer: {
-    paddingTop: 60,
-    alignItems: 'center',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#111111',
-  },
+  headerSpacer: { width: 32 },
+
+  scrollView: { flex: 1 },
+  loadingContainer: { paddingTop: 60, alignItems: 'center' },
+  divider: { height: 1, backgroundColor: '#111111' },
+
   commentsLabel: {
     color: '#f6c55a',
     fontFamily: MONO,
-    fontSize: 10,
+    fontSize: 12,
     letterSpacing: 0.18,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
+
   commentRow: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#111111',
   },
   commentTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 10,
   },
-  commentMeta: {
-    marginLeft: 8,
-    flexDirection: 'column',
-  },
+  commentMeta: { marginLeft: 10, flexDirection: 'column' },
   commentUsername: {
     color: colors.white,
     fontFamily: MONO,
-    fontSize: 9,
+    fontSize: 13,
+    letterSpacing: 0.12,
   },
   commentTime: {
-    color: '#333333',
-    fontFamily: MONO,
-    fontSize: 7,
-    marginTop: 2,
-  },
-  commentText: {
-    color: '#666666',
+    color: '#9a9a9a',
     fontFamily: MONO,
     fontSize: 10,
-    letterSpacing: 0.1,
-    marginTop: 8,
-    paddingLeft: 32,
-    lineHeight: 16,
+    marginTop: 3,
   },
+  commentText: {
+    color: '#aaaaaa',
+    fontFamily: MONO,
+    fontSize: 14,
+    letterSpacing: 0.08,
+    lineHeight: 22,
+    paddingLeft: 42,
+  },
+
   inputRow: {
     borderTopWidth: 1,
     borderTopColor: '#111111',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.black,
   },
   commentInput: {
     flex: 1,
-    marginHorizontal: 10,
+    marginHorizontal: 12,
     color: colors.white,
     fontFamily: MONO,
-    fontSize: 10,
+    fontSize: 13,
     borderBottomWidth: 1,
     borderBottomColor: '#2a2a2a',
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
   postButton: {
     color: colors.red,
@@ -434,6 +467,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
+
   commentErrorRow: {
     borderTopWidth: 1,
     borderTopColor: '#111111',
@@ -444,7 +478,7 @@ const styles = StyleSheet.create({
   commentErrorText: {
     color: colors.red,
     fontFamily: MONO,
-    fontSize: 8,
+    fontSize: 10,
     letterSpacing: 0.15,
   },
 });

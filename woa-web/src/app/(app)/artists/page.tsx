@@ -153,6 +153,14 @@ function Chip({
   )
 }
 
+function sortByFollowerCount<T extends { follower_count?: number | null }>(artists: T[]): T[] {
+  return [...artists].sort((a, b) => {
+    const aCount = Number(a.follower_count ?? 0)
+    const bCount = Number(b.follower_count ?? 0)
+    return bCount - aCount
+  })
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ArtistsPage() {
@@ -181,15 +189,16 @@ export default function ArtistsPage() {
         .from('profiles')
         .select('id, username, full_name, role, art_type, art_types, discipline, is_available, is_verified, profile_photo_url, city, country, follower_count')
         .in('role', ['ARTIST', 'COLLECTIVE'])
+        .order('follower_count', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(300)
-      const mapped = ((data as any[]) ?? []).map(a => ({
+      const mapped = sortByFollowerCount(((data as any[]) ?? []).map(a => ({
         ...a,
         art_types: a.art_types ?? [],
         discipline: a.discipline ?? null,
         is_available: a.is_available ?? false,
         is_verified: a.is_verified ?? false,
-      }))
+      })))
       setAllArtists(mapped as Artist[])
     } catch (e) {
       console.error('Failed to load artists:', e)
@@ -245,7 +254,7 @@ export default function ArtistsPage() {
     if (availableOnly) result = result.filter(a => a.is_available)
     if (collectivesOnly) result = result.filter(a => a.role === 'COLLECTIVE')
     if (verifiedOnly) result = result.filter(a => a.is_verified)
-    return result
+    return sortByFollowerCount(result)
   }, [allArtists, search, countryFilter, cityFilter, disciplineFilter, tagFilter, availableOnly, collectivesOnly, verifiedOnly])
 
   function shuffle() {
@@ -438,7 +447,7 @@ export default function ArtistsPage() {
                   {artist.profile_photo_url ? (
                     <img
                       src={artist.profile_photo_url}
-                      alt={artist.username ?? ''}
+                      alt={artist.full_name ?? artist.username ?? ''}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.75)', transition: 'filter 0.3s, transform 0.4s' }}
                     />
                   ) : (
@@ -452,13 +461,13 @@ export default function ArtistsPage() {
 
                   {/* Verified */}
                   {artist.is_verified && (
-                    <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, color: '#f6c55a' }}>✓</span>
+                    <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 8, fontWeight: 700, background: '#f6c55a', color: '#000', padding: '2px 6px', letterSpacing: '0.16em' }}>WOA</span>
                   )}
 
                   {/* Info overlay */}
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px 8px 8px', background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%)' }}>
                     <span style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: '#fff', marginBottom: 2 }}>
-                      {(artist.username ?? artist.full_name ?? '').toUpperCase()}
+                      {(artist.full_name ?? artist.username ?? '').toUpperCase()}
                     </span>
                     {disciplineLabel && (
                       <span style={{ fontSize: 9, color: '#c0392b', letterSpacing: '0.08em' }}>

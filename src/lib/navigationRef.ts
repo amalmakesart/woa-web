@@ -1,9 +1,9 @@
-import { createNavigationContainerRef } from '@react-navigation/native';
+import { CommonActions, createNavigationContainerRef } from '@react-navigation/native';
 
 export const navigationRef = createNavigationContainerRef<any>();
 
-export function navigate(name: string, params?: Record<string, any>) {
+export function navigate(name: string, params?: Record<string, unknown>) {
   if (navigationRef.isReady()) {
-    navigationRef.navigate(name as never, params as never);
+    navigationRef.dispatch(CommonActions.navigate({ name, params }));
   }
 }

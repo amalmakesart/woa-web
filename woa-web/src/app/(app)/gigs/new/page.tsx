@@ -98,12 +98,17 @@ export default function PostGigPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+      const admin = isAdminEmail(user.email)
       setCurrentUserId(user.id)
-      setIsAdmin(isAdminEmail(user.email))
-      const { data: me } = await supabase.from('profiles').select('full_name, username, company_name').eq('id', user.id).single()
-      if (me) {
-        const d = me as any
-        setPosterName(d.company_name ?? d.full_name ?? d.username ?? null)
+      setIsAdmin(admin)
+      const { data: me } = await supabase.from('profiles').select('full_name, username, company_name, role').eq('id', user.id).single()
+      const meData = me as any
+      if (!admin && meData?.role !== 'GIG_POSTER') {
+        router.replace('/gigs')
+        return
+      }
+      if (meData) {
+        setPosterName(meData.company_name ?? meData.full_name ?? meData.username ?? null)
       }
 
       if (editGigId) {

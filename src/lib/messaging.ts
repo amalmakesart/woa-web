@@ -9,6 +9,17 @@ export async function findOrCreateConversation(
   artistId: string,
   gigId: string | null,
 ): Promise<string | null> {
+  if (gigId) {
+    const { data: interest } = await supabase
+      .from('gig_interests')
+      .select('id')
+      .eq('gig_id', gigId)
+      .eq('artist_id', artistId)
+      .maybeSingle();
+
+    if (!interest) return null;
+  }
+
   // Search for existing conversation
   let query = supabase
     .from('conversations')
@@ -24,6 +35,10 @@ export async function findOrCreateConversation(
 
   const { data: existing } = await query.maybeSingle();
   if (existing) return existing.id;
+
+  if (!gigId) {
+    return null;
+  }
 
   // Create new conversation
   const { data: created, error } = await supabase

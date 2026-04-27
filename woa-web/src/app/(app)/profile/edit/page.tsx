@@ -43,7 +43,7 @@ export default function EditProfilePage() {
 
   const [fullName, setFullName] = useState('')
   const [username, setUsername] = useState('')
-  const [artType, setArtType] = useState('')
+  const [discipline, setDiscipline] = useState('')
   const [artTypes, setArtTypes] = useState<string[]>([])
   const [city, setCity] = useState('')
   const [country, setCountry] = useState('')
@@ -55,13 +55,16 @@ export default function EditProfilePage() {
   const [spotifyUrl, setSpotifyUrl] = useState('')
   const [isAvailable, setIsAvailable] = useState(false)
   const [companyName, setCompanyName] = useState('')
+  const [collectiveType, setCollectiveType] = useState('')
+  const [memberCount, setMemberCount] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [uploading, setUploading] = useState(false)
 
   const normalizedRole = (role ?? '').toUpperCase()
   const isGigPoster = normalizedRole === 'GIG_POSTER'
   const isCollective = normalizedRole === 'COLLECTIVE'
-  const showArtistFields = !isGigPoster && !isCollective
+  const isArtLover = normalizedRole === 'ART_LOVER'
+  const showArtistFields = !isGigPoster && !isCollective && !isArtLover
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -81,7 +84,7 @@ export default function EditProfilePage() {
         const d = data as any
         setFullName(d.full_name ?? '')
         setUsername(d.username ?? '')
-        setArtType(d.art_type ?? '')
+        setDiscipline(d.discipline ?? d.art_type ?? '')
         setArtTypes(d.art_types ?? [])
         setCity(d.city ?? '')
         setCountry(d.country ?? '')
@@ -93,6 +96,8 @@ export default function EditProfilePage() {
         setSpotifyUrl(d.spotify_url ?? '')
         setIsAvailable(d.is_available ?? false)
         setCompanyName(d.company_name ?? '')
+        setCollectiveType(d.collective_type ?? '')
+        setMemberCount(d.member_count != null ? String(d.member_count) : '')
         setAvatarUrl(d.profile_photo_url ?? '')
         setRole(d.role ?? null)
       }
@@ -148,14 +153,22 @@ export default function EditProfilePage() {
       profile_photo_url: avatarUrl || null,
     }
     if (showArtistFields) {
-      updates.art_type = artType || null
+      updates.discipline = discipline || null
+      updates.art_type = discipline || null
       updates.art_types = artTypes.length > 0 ? artTypes : null
       updates.experience = experience || null
       updates.spotify_url = spotifyUrl || null
       updates.is_available = isAvailable
     }
-    if (role === 'GIG_POSTER') {
+    if (isCollective) {
+      updates.collective_type = collectiveType || null
+      updates.member_count = memberCount ? parseInt(memberCount, 10) : null
+    }
+    if (isGigPoster) {
       updates.company_name = companyName || null
+    }
+    if (isArtLover) {
+      updates.art_types = artTypes.length > 0 ? artTypes : null
     }
 
     const { error: err } = await supabase.from('profiles').update(updates).eq('id', profileId)
@@ -220,6 +233,23 @@ export default function EditProfilePage() {
                 <input className="woa-input" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Your company or venue" />
               </div>
             )}
+            {isCollective && (
+              <>
+                <div>
+                  <label className="woa-input-label">ORGANIZATION TYPE</label>
+                  <select className="woa-input" value={collectiveType} onChange={e => setCollectiveType(e.target.value)} style={{ cursor: 'pointer' }}>
+                    <option value="">SELECT TYPE</option>
+                    {['GALLERY', 'RECORD LABEL', 'DANCE COMPANY', 'THEATRE COMPANY', 'FILM COLLECTIVE', 'MUSIC VENUE', 'ART RESIDENCY', 'PUBLISHING HOUSE', 'CREATIVE AGENCY', 'COMMUNITY ARTS ORG', 'FESTIVAL / EVENT', 'OTHER'].map(t => (
+                      <option key={t} value={t} style={{ background: '#111' }}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="woa-input-label">NUMBER OF MEMBERS (OPTIONAL)</label>
+                  <input className="woa-input" type="number" value={memberCount} onChange={e => setMemberCount(e.target.value.replace(/[^0-9]/g, ''))} placeholder="E.G. 12" min="1" />
+                </div>
+              </>
+            )}
             <div>
               <label className="woa-input-label">BIO</label>
               <textarea
@@ -243,7 +273,7 @@ export default function EditProfilePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label className="woa-input-label">MAIN DISCIPLINE</label>
-                <select className="woa-input" value={artType} onChange={e => setArtType(e.target.value)} style={{ cursor: 'pointer' }}>
+                <select className="woa-input" value={discipline} onChange={e => setDiscipline(e.target.value)} style={{ cursor: 'pointer' }}>
                   <option value="">SELECT DISCIPLINE</option>
                   {DISCIPLINES.map(d => <option key={d} value={d} style={{ background: '#111' }}>{d}</option>)}
                 </select>
@@ -393,6 +423,26 @@ export default function EditProfilePage() {
               {isAvailable ? 'AVAILABLE FOR BOOKINGS' : 'NOT AVAILABLE'}
             </span>
             </button>
+          </div>
+        )}
+
+        {/* ART LOVER — art interests */}
+        {isArtLover && (
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 20 }}>
+            <p style={{ fontSize: 9, letterSpacing: '0.2em', color: '#555', marginBottom: 14 }}>INTERESTS (UP TO 7)</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {ALL_ART_TYPES.map(type => {
+                const active = artTypes.includes(type)
+                const disabled = !active && artTypes.length >= 7
+                return (
+                  <button key={type} type="button" onClick={() => !disabled && toggleArtType(type)}
+                    style={{ padding: '5px 10px', fontSize: 9, letterSpacing: '0.08em', border: active ? '1px solid #c0392b' : '1px solid #2a2a2a', background: active ? 'rgba(192,57,43,0.12)' : 'transparent', color: active ? '#c0392b' : disabled ? '#333' : '#666', cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: disabled ? 0.5 : 1 }}>
+                    {type}
+                  </button>
+                )
+              })}
+            </div>
+            {artTypes.length > 0 && <p style={{ fontSize: 10, color: '#888', marginTop: 8, letterSpacing: '0.06em' }}>{artTypes.length}/7 SELECTED</p>}
           </div>
         )}
 

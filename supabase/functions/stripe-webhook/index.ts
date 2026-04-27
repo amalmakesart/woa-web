@@ -1,0 +1,103 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+function getServerKey(): string {
+  return Deno.env.get('SB_SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+}
+
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  getServerKey(),
+);
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
+};
+
+async function verifyStripeSignature(body: string, signature: string, secret: string): Promise<boolean> {
+  const parts = signature.split(',');
+  const timestamp = parts.find(p => p.startsWith('t='))?.split('=')[1];
+  const v1 = parts.find(p => p.startsWith('v1='))?.split('=')[1];
+  if (!timestamp || !v1) return false;
+
+  const payload = `${timestamp}.${body}`;
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+  const expected = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return expected === v1;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  const signature = req.headers.get('stripe-signature') ?? '';
+  const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '';
+  const body = await req.text();
+
+  const valid = await verifyStripeSignature(body, signature, webhookSecret);
+  if (!valid) {
+    console.error('Invalid webhook signature');
+    return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const event = JSON.parse(body);
+
+  if (event.type === 'payment_intent.succeeded') {
+    const intent = event.data.object;
+    const { type, user_id, is_featured, gig_id } = intent.metadata;
+
+    console.log('Payment succeeded:', type, user_id);
+
+    if (type === 'verified_artist' && user_id) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          is_verified: true,
+          verified_since: new Date().toISOString(),
+          stripe_subscription_id: intent.id,
+        })
+        .eq('id', user_id);
+
+      if (error) {
+        console.error('Failed to verify artist:', error);
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      console.log('Artist verified:', user_id);
+    }
+
+    if (type === 'gig_post') {
+      const updates: Record<string, unknown> = {};
+      if (is_featured === 'true') {
+        updates.is_featured = true;
+        updates.featured_until = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      }
+      updates.status = 'active';
+
+      if (gig_id) {
+        const { error } = await supabase.from('gigs').update(updates).eq('id', gig_id);
+        if (error) {
+          console.error('Failed to update gig:', error);
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        console.log('Gig updated:', gig_id);
+      } else {
+        console.warn('Received gig payment without gig_id metadata for user:', user_id);
+      }
+    }
+  }
+
+  return new Response(JSON.stringify({ received: true }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+});

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { isAdminEmail } from '@/lib/admin'
+import { WEBSITE_URL } from '@/lib/share'
 
 type ProfileTab = 'posts' | 'portfolio' | 'calendar'
 
@@ -107,6 +108,7 @@ export default function ArtistProfilePage() {
   const [followModal, setFollowModal] = useState<'followers' | 'following' | null>(null)
   const [followList, setFollowList] = useState<FollowUser[]>([])
   const [followListLoading, setFollowListLoading] = useState(false)
+  const [shareLoading, setShareLoading] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -131,7 +133,7 @@ export default function ArtistProfilePage() {
         user ? supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', id).maybeSingle() : Promise.resolve({ data: null }),
         supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', id),
         supabase.from('portfolio_sections').select('id, title, cover_image_url, display_order').eq('artist_id', id).order('display_order'),
-        supabase.from('shows').select('*').eq('artist_id', id).gte('show_date', new Date().toISOString()).order('show_date').limit(20),
+        supabase.from('shows').select('*').eq('artist_id', id).order('show_date', { ascending: false }).limit(40),
         supabase.from('reviews').select('id, rating, body, created_at, profiles:reviewer_id(username, profile_photo_url)').eq('reviewee_id', id).order('created_at', { ascending: false }).limit(10),
         supabase.from('post_collaborators').select('post_id').eq('collaborator_id', id).eq('accepted', true),
       ])
@@ -221,6 +223,38 @@ export default function ArtistProfilePage() {
     setMessagingLoading(false)
   }
 
+  async function handleShareProfile() {
+    const shareUrl = `${WEBSITE_URL}/share/profile/${id}`
+    const shareTitle = profile?.full_name ?? profile?.username ?? 'WORK(ER) OF ART'
+    setShareLoading(true)
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: shareTitle,
+          text: `${shareTitle} on WORK(ER) OF ART`,
+          url: shareUrl,
+        })
+      } else {
+        await navigator.clipboard.writeText(shareUrl)
+        window.alert('PROFILE LINK COPIED')
+      }
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') {
+        window.alert('COULD NOT SHARE PROFILE')
+      }
+    } finally {
+      setShareLoading(false)
+    }
+  }
+
+  async function handleBlock() {
+    if (!currentUserId) return
+    if (!window.confirm('BLOCK THIS USER? YOU WILL NO LONGER SEE THEIR CONTENT.')) return
+    const supabase = createClient()
+    await supabase.from('blocks').insert({ blocker_id: currentUserId, blocked_id: id })
+    router.back()
+  }
+
   async function openFollowModal(mode: 'followers' | 'following') {
     setFollowModal(mode)
     setFollowListLoading(true)
@@ -250,7 +284,7 @@ export default function ArtistProfilePage() {
   if (!profile) return <div style={{ textAlign: 'center', padding: '80px 20px', color: '#888880', fontSize: 11, letterSpacing: '0.1em' }}>ARTIST NOT FOUND</div>
 
   const isOwn = currentUserId === id
-  const displayName = (profile.username ?? profile.full_name ?? '').toUpperCase()
+  const displayName = (profile.full_name ?? profile.username ?? '').toUpperCase()
   const location = [profile.city, profile.country].filter(Boolean).join(', ').toUpperCase()
   const discipline = (profile.discipline ?? profile.art_type ?? '').toUpperCase()
   const avgRating = profile.rating ?? 0
@@ -277,7 +311,7 @@ export default function ArtistProfilePage() {
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '0.04em' }}>{displayName}</h1>
-            {profile.is_verified && <span style={{ fontSize: 10, color: '#f6c55a', border: '1px solid #f6c55a', padding: '2px 6px', letterSpacing: '0.1em' }}>✓ VERIFIED</span>}
+            {profile.is_verified && <span style={{ fontSize: 9, fontWeight: 700, background: '#f6c55a', color: '#000', padding: '3px 9px', letterSpacing: '0.18em', display: 'inline-block' }}>WOA</span>}
             {profile.is_available && <span style={{ fontSize: 9, color: '#2a7a4f', border: '1px solid #2a7a4f', padding: '2px 6px', letterSpacing: '0.1em' }}>● AVAILABLE</span>}
           </div>
 
@@ -346,6 +380,21 @@ export default function ArtistProfilePage() {
               <button onClick={handleMessage} className="btn-red" style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em' }} disabled={messagingLoading}>
                 {messagingLoading ? '...' : 'MESSAGE'}
               </button>
+              <button
+                onClick={handleShareProfile}
+                style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em', border: '1px solid rgba(255,255,255,0.16)', background: 'transparent', color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}
+                disabled={shareLoading}
+              >
+                {shareLoading ? '...' : 'SHARE'}
+              </button>
+              {currentUserId && (
+                <button
+                  onClick={handleBlock}
+                  style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em', border: '1px solid rgba(192,57,43,0.4)', background: 'transparent', color: '#c0392b', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  BLOCK
+                </button>
+              )}
               {isAdmin && (
                 <button
                   onClick={() => router.push(`/profile/edit?target=${id}`)}
@@ -357,7 +406,16 @@ export default function ArtistProfilePage() {
               )}
             </div>
           ) : (
-            <Link href="/profile/edit" className="btn-primary" style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em', display: 'inline-block' }}>EDIT PROFILE</Link>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <Link href="/profile/edit" className="btn-primary" style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em', display: 'inline-block' }}>EDIT PROFILE</Link>
+              <button
+                onClick={handleShareProfile}
+                style={{ padding: '8px 22px', fontSize: 10, letterSpacing: '0.12em', border: '1px solid rgba(255,255,255,0.16)', background: 'transparent', color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}
+                disabled={shareLoading}
+              >
+                {shareLoading ? '...' : 'SHARE'}
+              </button>
+            </div>
           )}
         </div>
       </div>

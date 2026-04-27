@@ -10,16 +10,38 @@ import {
   SafeAreaView,
   RefreshControl,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../constants/colors';
 import { supabase } from '../../lib/supabase';
 import GigCard, { Gig, GIG_ART_TYPES, formatBudget } from '../../components/GigCard';
 import OctagonalImage from '../../components/OctagonalImage';
 import MiniLogo from '../../components/MiniLogo';
 import BellButton from '../../components/BellButton';
+import MessageButton from '../../components/MessageButton';
 
 const MONO = Platform.select({ ios: 'Courier New', android: 'monospace' }) as string;
+const GOLD = '#f6c55a';
+
+function parseLocationParts(location: string | null) {
+  const raw = location?.trim();
+  if (!raw) return { country: null as string | null, city: null as string | null };
+  if (raw.toLowerCase() === 'remote') {
+    return { country: 'Remote', city: null };
+  }
+
+  const parts = raw.split(',').map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    return {
+      city: parts.slice(0, -1).join(', '),
+      country: parts[parts.length - 1],
+    };
+  }
+
+  return { country: raw, city: null };
+}
 
 // ─── Filter Modal (same pattern as Artists tab) ───────────────────────────────
 
@@ -62,24 +84,31 @@ const fm = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: { backgroundColor: '#0a0a0a', borderTopWidth: 1, borderTopColor: '#222222', maxHeight: '60%', paddingBottom: 30 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
-  title: { color: colors.white, fontFamily: MONO, fontSize: 9, letterSpacing: 0.2 },
-  clear: { color: colors.red, fontFamily: MONO, fontSize: 8, letterSpacing: 0.15 },
+  title: { color: colors.white, fontFamily: MONO, fontSize: 12, letterSpacing: 0.2 },
+  clear: { color: colors.red, fontFamily: MONO, fontSize: 11, letterSpacing: 0.15 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: '#111111' },
-  rowText: { color: '#555555', fontFamily: MONO, fontSize: 9, letterSpacing: 0.1 },
+  rowText: { color: '#b5b5b5', fontFamily: MONO, fontSize: 11, letterSpacing: 0.1 },
   rowActive: { color: colors.white },
-  check: { color: colors.red, fontFamily: MONO, fontSize: 9 },
+  check: { color: colors.red, fontFamily: MONO, fontSize: 11 },
 });
 
 // ─── Top Bar (shared) ─────────────────────────────────────────────────────────
 
 function TopBar({
-  title, avatarUri, onAvatarPress, onBellPress,
-}: { title: string; avatarUri: string | null; onAvatarPress: () => void; onBellPress: () => void }) {
+  title, avatarUri, onAvatarPress, onBellPress, onMessagePress,
+}: {
+  title: string;
+  avatarUri: string | null;
+  onAvatarPress: () => void;
+  onBellPress: () => void;
+  onMessagePress: () => void;
+}) {
   return (
     <View style={s.topBar}>
       <MiniLogo />
       <Text style={s.topBarTitle}>{title}</Text>
       <View style={s.topBarRight}>
+        <MessageButton onPress={onMessagePress} />
         <BellButton onPress={onBellPress} />
         <OctagonalImage size={24} imageUri={avatarUri} onPress={onAvatarPress} />
       </View>
@@ -89,20 +118,66 @@ function TopBar({
 
 // ─── My Gig Card (Gig Poster view) ───────────────────────────────────────────
 
-function MyGigRow({ gig, onPress }: { gig: Gig; onPress: () => void }) {
-  const meta = [gig.art_type, gig.location, gig.date_timeframe]
-    .filter(Boolean).join(' · ').toUpperCase();
+function MyGigRow({ gig, onPress, onDelete, onClose }: {
+  gig: Gig; onPress: () => void; onDelete: () => void; onClose: () => void;
+}) {
   const isActive = gig.status === 'active';
+
+  const handleDelete = () => {
+    Alert.alert(
+      'DELETE GIG',
+      'Are you sure you want to permanently delete this gig?',
+      [
+        { text: 'CANCEL', style: 'cancel' },
+        { text: 'DELETE', style: 'destructive', onPress: onDelete },
+      ]
+    );
+  };
+
+  const handleClose = () => {
+    Alert.alert(
+      '⚠️ CLOSE GIG',
+      'This will permanently close the gig. Artists will no longer be able to express interest. This cannot be undone.',
+      [
+        { text: 'CANCEL', style: 'cancel' },
+        { text: 'CLOSE GIG', style: 'destructive', onPress: onClose },
+      ]
+    );
+  };
 
   return (
     <TouchableOpacity style={s.myGigRow} onPress={onPress} activeOpacity={0.8}>
       <View style={s.myGigLeft}>
         <Text style={s.myGigTitle} numberOfLines={2}>{gig.title.toUpperCase()}</Text>
-        <Text style={s.myGigMeta}>{meta}</Text>
-        <View style={[s.statusBadge, isActive ? s.statusActive : s.statusClosed]}>
-          <Text style={[s.statusText, isActive ? s.statusTextActive : s.statusTextClosed]}>
-            {isActive ? 'ACTIVE' : 'CLOSED'}
-          </Text>
+        {gig.art_type ? (
+          <Text style={s.myGigMetaType}>{gig.art_type.toUpperCase()}</Text>
+        ) : null}
+        {gig.location ? (
+          <View style={s.myGigMetaRow}>
+            <Text style={s.myGigMetaIcon}>⌖</Text>
+            <Text style={s.myGigMeta} numberOfLines={1}>{gig.location.toUpperCase()}</Text>
+          </View>
+        ) : null}
+        {gig.date_timeframe ? (
+          <View style={s.myGigMetaRow}>
+            <Text style={s.myGigMetaIcon}>◷</Text>
+            <Text style={s.myGigMeta} numberOfLines={2}>{gig.date_timeframe.toUpperCase()}</Text>
+          </View>
+        ) : null}
+        <View style={s.myGigBottomRow}>
+          <View style={[s.statusBadge, isActive ? s.statusActive : s.statusClosed]}>
+            <Text style={[s.statusText, isActive ? s.statusTextActive : s.statusTextClosed]}>
+              {isActive ? 'ACTIVE' : 'INACTIVE'}
+            </Text>
+          </View>
+          {isActive ? (
+            <TouchableOpacity style={s.closeBtn} onPress={handleClose} activeOpacity={0.7}>
+              <Text style={s.closeBtnText}>⚠ CLOSE</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity style={s.deleteBtn} onPress={handleDelete} activeOpacity={0.7}>
+            <Text style={s.deleteBtnText}>DELETE</Text>
+          </TouchableOpacity>
         </View>
       </View>
       <View style={s.myGigRight}>
@@ -122,8 +197,9 @@ function GigBoardView({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [artTypeFilter, setArtTypeFilter] = useState<string | null>(null);
-  const [locationFilter, setLocationFilter] = useState<string | null>(null);
-  const [activeModal, setActiveModal] = useState<'artType' | 'location' | null>(null);
+  const [countryFilter, setCountryFilter] = useState<string | null>(null);
+  const [cityFilter, setCityFilter] = useState<string | null>(null);
+  const [activeModal, setActiveModal] = useState<'artType' | 'country' | 'city' | null>(null);
 
   const loadGigs = useCallback(async () => {
     const { data } = await supabase
@@ -152,43 +228,92 @@ function GigBoardView({
 
   useFocusEffect(useCallback(() => { loadGigs(); }, [loadGigs]));
 
-  const availableLocations = useMemo(() =>
-    [...new Set(allGigs.map((g) => g.location).filter(Boolean) as string[])].sort(),
+  const availableCountries = useMemo(() =>
+    [...new Set(allGigs.map((gig) => parseLocationParts(gig.location).country).filter(Boolean) as string[])].sort(),
     [allGigs]
   );
 
+  const availableCities = useMemo(() => {
+    const source = countryFilter
+      ? allGigs.filter((gig) => parseLocationParts(gig.location).country === countryFilter)
+      : allGigs;
+    return [...new Set(source.map((gig) => parseLocationParts(gig.location).city).filter(Boolean) as string[])].sort();
+  }, [allGigs, countryFilter]);
+
   const filtered = useMemo(() => {
     let r = allGigs;
+    if (countryFilter) {
+      r = r.filter((gig) => parseLocationParts(gig.location).country === countryFilter);
+    }
+    if (cityFilter) {
+      r = r.filter((gig) => parseLocationParts(gig.location).city === cityFilter);
+    }
     if (artTypeFilter) r = r.filter((g) => g.art_type === artTypeFilter);
-    if (locationFilter) r = r.filter((g) => g.location === locationFilter);
     return r;
-  }, [allGigs, artTypeFilter, locationFilter]);
+  }, [allGigs, artTypeFilter, countryFilter, cityFilter]);
+
+  const handleSelectCountry = (country: string) => {
+    setCountryFilter(country);
+    setCityFilter(null);
+  };
 
   return (
     <>
-      <TopBar title="GIGS" avatarUri={avatarUri} onAvatarPress={() => navigation.navigate('Profile')} onBellPress={() => navigation.navigate('Notifications')} />
+      <TopBar title="GIGS" avatarUri={avatarUri} onAvatarPress={() => navigation.navigate('Profile')} onBellPress={() => navigation.navigate('Notifications')} onMessagePress={() => navigation.navigate('Inbox')} />
+
+      <View style={s.descriptionRow}>
+        <Text style={s.descriptionText}>FIND PAID OPPORTUNITIES AND APPLY FOR GIGS THAT FIT YOUR CRAFT</Text>
+      </View>
 
       {/* Filters */}
-      <View style={s.filterSection}>
-        <Text style={s.filterLabel}>FILTER GIGS</Text>
-        <View style={s.filterRow}>
+      <View style={s.filterBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.filterScroll}
+        >
           <TouchableOpacity
-            style={[s.filterPill, artTypeFilter && s.filterPillActive]}
-            onPress={() => setActiveModal('artType')} activeOpacity={0.7}
+            style={[s.chip, artTypeFilter && s.chipActive]}
+            onPress={() => artTypeFilter ? setArtTypeFilter(null) : setActiveModal('artType')} activeOpacity={0.7}
           >
-            <Text style={[s.filterText, artTypeFilter && s.filterTextActive]} numberOfLines={1}>
-              {artTypeFilter ? artTypeFilter.toUpperCase() : 'ALL TYPES'}
+            <Ionicons name="brush-outline" size={12} color={artTypeFilter ? colors.white : colors.red} style={s.chipIcon} />
+            <Text style={[s.chipText, artTypeFilter && s.chipTextActive]} numberOfLines={1}>
+              {artTypeFilter ? artTypeFilter.toUpperCase() : 'ART TYPE'}
             </Text>
+            {artTypeFilter ? <Text style={s.chipX}> ✕</Text> : null}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[s.filterPill, locationFilter && s.filterPillActive]}
-            onPress={() => setActiveModal('location')} activeOpacity={0.7}
+            style={[s.chip, countryFilter && s.chipActive]}
+            onPress={() => countryFilter ? (setCountryFilter(null), setCityFilter(null)) : setActiveModal('country')} activeOpacity={0.7}
           >
-            <Text style={[s.filterText, locationFilter && s.filterTextActive]} numberOfLines={1}>
-              {locationFilter ? locationFilter.toUpperCase() : 'ALL LOCATIONS'}
+            <Ionicons name="globe-outline" size={12} color={countryFilter ? colors.white : colors.red} style={s.chipIcon} />
+            <Text style={[s.chipText, countryFilter && s.chipTextActive]} numberOfLines={1}>
+              {countryFilter ? countryFilter.toUpperCase() : 'COUNTRY'}
             </Text>
+            {countryFilter ? <Text style={s.chipX}> ✕</Text> : null}
           </TouchableOpacity>
-        </View>
+
+          <TouchableOpacity
+            style={[s.chip, cityFilter && s.chipActive]}
+            onPress={() => cityFilter ? setCityFilter(null) : setActiveModal('city')} activeOpacity={0.7}
+          >
+            <Ionicons name="location-outline" size={12} color={cityFilter ? colors.white : colors.red} style={s.chipIcon} />
+            <Text style={[s.chipText, cityFilter && s.chipTextActive]} numberOfLines={1}>
+              {cityFilter ? cityFilter.toUpperCase() : 'CITY'}
+            </Text>
+            {cityFilter ? <Text style={s.chipX}> ✕</Text> : null}
+          </TouchableOpacity>
+
+          {(artTypeFilter || countryFilter || cityFilter) ? (
+            <TouchableOpacity
+              style={s.chipClear}
+              onPress={() => { setArtTypeFilter(null); setCountryFilter(null); setCityFilter(null); }}
+              activeOpacity={0.7}
+            >
+              <Text style={s.chipClearText}>CLEAR ALL</Text>
+            </TouchableOpacity>
+          ) : null}
+        </ScrollView>
       </View>
 
       {/* Gig list */}
@@ -200,10 +325,10 @@ function GigBoardView({
         <View style={s.emptyContainer}>
           <Text style={s.emptyTitle}>NO GIGS FOUND</Text>
           <Text style={s.emptySub}>TRY ADJUSTING YOUR FILTERS</Text>
-          {(artTypeFilter || locationFilter) && (
+          {(artTypeFilter || countryFilter || cityFilter) && (
             <TouchableOpacity
               style={s.resetBtn}
-              onPress={() => { setArtTypeFilter(null); setLocationFilter(null); }}
+              onPress={() => { setArtTypeFilter(null); setCountryFilter(null); setCityFilter(null); }}
               activeOpacity={0.7}
             >
               <Text style={s.resetBtnText}>RESET FILTERS</Text>
@@ -237,12 +362,21 @@ function GigBoardView({
         onClose={() => setActiveModal(null)}
       />
       <FilterModal
-        visible={activeModal === 'location'}
-        title="SELECT LOCATION"
-        options={['Remote', ...availableLocations]}
-        selected={locationFilter}
-        onSelect={setLocationFilter}
-        onClear={() => setLocationFilter(null)}
+        visible={activeModal === 'country'}
+        title="SELECT COUNTRY"
+        options={availableCountries}
+        selected={countryFilter}
+        onSelect={handleSelectCountry}
+        onClear={() => { setCountryFilter(null); setCityFilter(null); }}
+        onClose={() => setActiveModal(null)}
+      />
+      <FilterModal
+        visible={activeModal === 'city'}
+        title="SELECT CITY"
+        options={availableCities}
+        selected={cityFilter}
+        onSelect={setCityFilter}
+        onClear={() => setCityFilter(null)}
         onClose={() => setActiveModal(null)}
       />
     </>
@@ -278,15 +412,26 @@ function MyGigsView({
       countMap[r.gig_id] = (countMap[r.gig_id] ?? 0) + 1;
     });
 
-    setMyGigs(data.map((g: any) => ({ ...g, interest_count: countMap[g.id] ?? 0 })) as Gig[]);
+    const visibleGigs = data.filter((g: any) => g.status !== 'payment_pending');
+    setMyGigs(visibleGigs.map((g: any) => ({ ...g, interest_count: countMap[g.id] ?? 0 })) as Gig[]);
     setLoading(false);
   }, []);
+
+  const handleDeleteGig = async (gigId: string) => {
+    setMyGigs(prev => prev.filter(g => g.id !== gigId));
+    await supabase.from('gigs').delete().eq('id', gigId);
+  };
+
+  const handleCloseGig = async (gigId: string) => {
+    setMyGigs(prev => prev.map(g => g.id === gigId ? { ...g, status: 'closed' } : g));
+    await supabase.from('gigs').update({ status: 'closed' }).eq('id', gigId);
+  };
 
   useFocusEffect(useCallback(() => { loadMyGigs(); }, [loadMyGigs]));
 
   return (
     <>
-      <TopBar title="MY GIGS" avatarUri={avatarUri} onAvatarPress={() => navigation.navigate('Profile')} onBellPress={() => navigation.navigate('Notifications')} />
+      <TopBar title="MY GIGS" avatarUri={avatarUri} onAvatarPress={() => navigation.navigate('Profile')} onBellPress={() => navigation.navigate('Notifications')} onMessagePress={() => navigation.navigate('Inbox')} />
 
       {loading ? (
         <View style={s.loadingRow}>
@@ -311,6 +456,8 @@ function MyGigsView({
             <MyGigRow
               gig={item}
               onPress={() => navigation.navigate('InterestedArtists', { gigId: item.id, gigTitle: item.title })}
+              onDelete={() => handleDeleteGig(item.id)}
+              onClose={() => handleCloseGig(item.id)}
             />
           )}
           ListFooterComponent={
@@ -336,23 +483,42 @@ export default function GigsScreen() {
   const [roleLoading, setRoleLoading] = useState(true);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('role, profile_photo_url')
-          .eq('id', user.id)
-          .single();
-        if (data) {
-          setRole((data as any).role ?? 'ARTIST');
-          setAvatarUri((data as any).profile_photo_url ?? null);
-        }
-      }
+  const loadCurrentUserProfile = useCallback(async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    let uid = sessionData.session?.user?.id ?? null;
+
+    if (!uid) {
+      const { data: userData } = await supabase.auth.getUser();
+      uid = userData.user?.id ?? null;
+    }
+
+    if (!uid) {
+      setRole(null);
+      setAvatarUri(null);
       setRoleLoading(false);
-    })();
+      return;
+    }
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('role, profile_photo_url')
+      .eq('id', uid)
+      .maybeSingle();
+
+    setRole((data as any)?.role ?? null);
+    setAvatarUri((data as any)?.profile_photo_url ?? null);
+    setRoleLoading(false);
   }, []);
+
+  useEffect(() => {
+    void loadCurrentUserProfile();
+  }, [loadCurrentUserProfile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadCurrentUserProfile();
+    }, [loadCurrentUserProfile])
+  );
 
   if (roleLoading) {
     return (
@@ -389,21 +555,42 @@ const s = StyleSheet.create({
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   notifDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.red },
 
-  // Filters
-  filterSection: {
-    paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8,
+  // Description row
+  descriptionRow: {
+    paddingHorizontal: 16, paddingVertical: 8,
     borderBottomWidth: 1, borderBottomColor: '#111111',
   },
-  filterLabel: { color: '#444444', fontFamily: MONO, fontSize: 9, letterSpacing: 0.2, marginBottom: 8 },
-  filterRow: { flexDirection: 'row', gap: 6 },
-  filterPill: {
-    flex: 1, backgroundColor: colors.black, borderWidth: 1, borderColor: '#222222',
-    minHeight: 44, paddingVertical: 10, paddingHorizontal: 12,
-    alignItems: 'center', justifyContent: 'center',
+  descriptionText: {
+    color: GOLD, fontFamily: MONO, fontSize: 9, letterSpacing: 0.2,
   },
-  filterPillActive: { borderColor: colors.white },
-  filterText: { color: '#555555', fontFamily: MONO, fontSize: 11, letterSpacing: 0.1 },
-  filterTextActive: { color: colors.white },
+
+  // Filters
+  filterBar: {
+    flexDirection: 'row', alignItems: 'center',
+    borderBottomWidth: 1, borderBottomColor: '#111111',
+  },
+  filterScroll: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2b2b2b',
+    paddingHorizontal: 10,
+    height: 32,
+  },
+  chipActive: { borderColor: colors.white, backgroundColor: '#111111' },
+  chipIcon: { marginRight: 4 },
+  chipText: { color: '#9a9a9a', fontFamily: MONO, fontSize: 11, letterSpacing: 0.12, maxWidth: 120 },
+  chipTextActive: { color: colors.white },
+  chipX: { color: colors.white, fontFamily: MONO, fontSize: 11 },
+  chipClear: {
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    height: 32,
+    borderWidth: 1,
+    borderColor: colors.red,
+  },
+  chipClearText: { color: colors.red, fontFamily: MONO, fontSize: 11, letterSpacing: 0.12 },
 
   // Skeleton / loading
   loadingRow: { paddingTop: 1 },
@@ -411,12 +598,26 @@ const s = StyleSheet.create({
 
   // Empty
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  emptyTitle: { color: colors.white, fontFamily: MONO, fontSize: 10, letterSpacing: 0.2 },
-  emptySub: { color: '#444444', fontFamily: MONO, fontSize: 8, letterSpacing: 0.15 },
+  emptyTitle: { color: colors.white, fontFamily: MONO, fontSize: 12, letterSpacing: 0.2 },
+  emptySub: { color: '#9a9a9a', fontFamily: MONO, fontSize: 11, letterSpacing: 0.15, lineHeight: 17 },
   resetBtn: { borderWidth: 1, borderColor: colors.red, paddingVertical: 8, paddingHorizontal: 16 },
-  resetBtnText: { color: colors.red, fontFamily: MONO, fontSize: 8, letterSpacing: 0.15 },
+  resetBtnText: { color: colors.red, fontFamily: MONO, fontSize: 11, letterSpacing: 0.15 },
 
-  // My Gig Row
+  myGigBottomRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' },
+  closeBtn: {
+    borderWidth: 1, borderColor: '#c47a00',
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  closeBtnText: { color: '#c47a00', fontFamily: MONO, fontSize: 11, letterSpacing: 0.15 },
+  deleteBtn: {
+    borderWidth: 1, borderColor: colors.red,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  deleteBtnText: { color: colors.red, fontFamily: MONO, fontSize: 11, letterSpacing: 0.15 },
+  statusBadge: {
+    alignSelf: 'flex-start', borderWidth: 1,
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
   myGigRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 16,
@@ -425,19 +626,18 @@ const s = StyleSheet.create({
   },
   myGigLeft: { flex: 1, marginRight: 12 },
   myGigTitle: { color: colors.white, fontFamily: MONO, fontSize: 14, letterSpacing: 0.12, marginBottom: 4 },
-  myGigMeta: { color: '#444444', fontFamily: MONO, fontSize: 10, letterSpacing: 0.12, marginBottom: 8 },
-  statusBadge: {
-    alignSelf: 'flex-start', borderWidth: 1,
-    paddingHorizontal: 12, paddingVertical: 6,
-  },
+  myGigMetaType: { color: '#b5b5b5', fontFamily: MONO, fontSize: 11, letterSpacing: 0.12, marginBottom: 6 },
+  myGigMetaRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 6 },
+  myGigMetaIcon: { color: colors.red, fontFamily: MONO, fontSize: 11, lineHeight: 16, marginTop: 1 },
+  myGigMeta: { flex: 1, color: '#9a9a9a', fontFamily: MONO, fontSize: 11, letterSpacing: 0.12, marginBottom: 0, lineHeight: 16 },
   statusActive: { borderColor: '#2a7a4f' },
   statusClosed: { borderColor: '#333333' },
-  statusText: { fontFamily: MONO, fontSize: 9, letterSpacing: 0.15 },
+  statusText: { fontFamily: MONO, fontSize: 11, letterSpacing: 0.15 },
   statusTextActive: { color: '#2a7a4f' },
-  statusTextClosed: { color: '#333333' },
+  statusTextClosed: { color: '#8f8f8f' },
   myGigRight: { alignItems: 'center' },
   interestBig: { color: colors.red, fontFamily: MONO, fontSize: 22, letterSpacing: 0.1 },
-  interestSmall: { color: '#444444', fontFamily: MONO, fontSize: 8, letterSpacing: 0.15 },
+  interestSmall: { color: '#9a9a9a', fontFamily: MONO, fontSize: 11, letterSpacing: 0.15 },
 
   // Post gig button
   postGigBtn: {
@@ -445,5 +645,5 @@ const s = StyleSheet.create({
     marginHorizontal: 16, marginVertical: 16,
     height: 44, alignItems: 'center', justifyContent: 'center',
   },
-  postGigBtnText: { color: colors.red, fontFamily: MONO, fontSize: 9, letterSpacing: 0.18 },
+  postGigBtnText: { color: colors.red, fontFamily: MONO, fontSize: 11, letterSpacing: 0.18 },
 });

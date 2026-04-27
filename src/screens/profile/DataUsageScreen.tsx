@@ -75,8 +75,8 @@ export default function DataUsageScreen() {
           <Text style={s.footerText}>
             FOR FULL DETAILS READ OUR PRIVACY POLICY OR EMAIL{' '}
           </Text>
-          <TouchableOpacity onPress={() => Linking.openURL('mailto:privacy@workerofart.com')} activeOpacity={0.7}>
-            <Text style={s.footerEmail}>PRIVACY@WORKEROFART.COM</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('mailto:admin@workerofart.com')} activeOpacity={0.7}>
+            <Text style={s.footerEmail}>ADMIN@WORKEROFART.COM</Text>
           </TouchableOpacity>
         </View>
 
@@ -97,7 +97,7 @@ const s = StyleSheet.create({
   },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 12 },
   backArrow: { color: colors.white, fontFamily: MONO, fontSize: 28, lineHeight: 32 },
-  backLabel: { color: '#666666', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
+  backLabel: { color: '#9a9a9a', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
   topBarTitle: { color: colors.white, fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
 
   mainTitle: {
@@ -105,7 +105,7 @@ const s = StyleSheet.create({
     fontSize: 14, letterSpacing: 0.3, marginBottom: 14,
   },
   intro: {
-    color: '#666666', fontFamily: MONO,
+    color: '#b5b5b5', fontFamily: MONO,
     fontSize: 10, letterSpacing: 0.08, lineHeight: 17,
     marginBottom: 24,
   },
@@ -113,16 +113,16 @@ const s = StyleSheet.create({
   section: { marginBottom: 24 },
   sectionLabel: {
     color: colors.red, fontFamily: MONO,
-    fontSize: 8, letterSpacing: 0.2, marginBottom: 12,
+    fontSize: 11, letterSpacing: 0.2, marginBottom: 12,
   },
   item: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  itemDash: { color: '#333333', fontFamily: MONO, fontSize: 9 },
-  itemText: { flex: 1, color: '#555555', fontFamily: MONO, fontSize: 9, letterSpacing: 0.08, lineHeight: 14 },
+  itemDash: { color: '#b5b5b5', fontFamily: MONO, fontSize: 11 },
+  itemText: { flex: 1, color: '#b5b5b5', fontFamily: MONO, fontSize: 11, letterSpacing: 0.08, lineHeight: 17 },
 
   footer: {
     borderTopWidth: 1, borderTopColor: '#111111',
     paddingTop: 20, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center',
   },
-  footerText: { color: '#333333', fontFamily: MONO, fontSize: 7, letterSpacing: 0.1, lineHeight: 13 },
-  footerEmail: { color: colors.red, fontFamily: MONO, fontSize: 7, letterSpacing: 0.1 },
+  footerText: { color: '#b5b5b5', fontFamily: MONO, fontSize: 11, letterSpacing: 0.1, lineHeight: 16 },
+  footerEmail: { color: colors.red, fontFamily: MONO, fontSize: 11, letterSpacing: 0.1 },
 });

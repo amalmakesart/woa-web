@@ -1,72 +1,3 @@
-export const ARTIST_TAGS: string[] = [
-  // Photography
-  '#WEDDING PHOTOGRAPHER', '#PORTRAIT PHOTOGRAPHER', '#FASHION PHOTOGRAPHER',
-  '#COMMERCIAL PHOTOGRAPHER', '#DOCUMENTARY PHOTOGRAPHER', '#STREET PHOTOGRAPHER',
-  '#EVENT PHOTOGRAPHER', '#PRODUCT PHOTOGRAPHER', '#ARCHITECTURAL PHOTOGRAPHER',
-  '#SPORTS PHOTOGRAPHER', '#BOUDOIR PHOTOGRAPHER',
-  // Music
-  '#ROCK BAND', '#JAZZ MUSICIAN', '#CLASSICAL MUSICIAN', '#DJ', '#LIVE PERFORMER',
-  '#SESSION MUSICIAN', '#SINGER-SONGWRITER', '#MUSIC PRODUCER', '#ELECTRONIC ARTIST',
-  '#ACOUSTIC ARTIST', '#RAPPER', '#CHOIR', '#COVER BAND',
-  // Visual Art
-  '#ABSTRACT ARTIST', '#PORTRAIT PAINTER', '#LANDSCAPE ARTIST', '#STREET MURALIST',
-  '#GRAFFITI ARTIST', '#FINE ART', '#CONTEMPORARY ART', '#INSTALLATION ARTIST',
-  '#MIXED MEDIA', '#WATERCOLOUR',
-  // Design
-  '#BRAND DESIGNER', '#UI/UX DESIGNER', '#LOGO DESIGNER', '#MOTION DESIGNER',
-  '#TYPOGRAPHER', '#PACKAGING DESIGNER', '#EDITORIAL DESIGNER', '#3D DESIGNER',
-  // Video / Film
-  '#WEDDING VIDEOGRAPHER', '#DOCUMENTARY FILMMAKER', '#COMMERCIAL DIRECTOR',
-  '#MUSIC VIDEO DIRECTOR', '#CONTENT CREATOR', '#DRONE OPERATOR', '#FILM EDITOR',
-  // Performance
-  '#STAND-UP COMEDIAN', '#THEATRICAL ACTOR', '#VOICE ACTOR', '#IMPROV ARTIST',
-  '#SPOKEN WORD', '#STREET PERFORMER', '#CIRCUS ARTIST',
-  // Dance
-  '#BALLET', '#CONTEMPORARY DANCE', '#HIP-HOP DANCER', '#SALSA DANCER',
-  '#AERIAL ARTIST', '#CHOREOGRAPHER FOR HIRE',
-  // Fashion / Textiles
-  '#FASHION DESIGNER', '#COSTUME MAKER', '#TEXTILE ARTIST', '#EMBROIDERY ARTIST',
-  '#JEWELLERY MAKER', '#HAND-MADE',
-  // Other
-  '#TATTOO ARTIST', '#CERAMICIST', '#SCULPTOR', '#ILLUSTRATOR',
-  '#CHILDREN\'S ILLUSTRATOR', '#CONCEPT ARTIST', '#STORYBOARD ARTIST',
-  '#MAKEUP ARTIST', '#NAIL ARTIST', '#HAIR STYLIST',
-  // Availability / Work style
-  '#FREELANCE', '#COMMISSION OPEN', '#AVAILABLE FOR TRAVEL', '#STUDIO BASED',
-  '#REMOTE WORK', '#WORKSHOPS & TEACHING',
-];
-
-export const ARTIST_TYPES: string[] = [
-  'Actor',
-  'Animator',
-  'Art Director',
-  'Ceramicist',
-  'Choreographer',
-  'Costume Designer',
-  'Dancer',
-  'Digital Artist',
-  'Filmmaker',
-  'Graphic Designer',
-  'Illustrator',
-  'Jewellery Designer',
-  'Muralist',
-  'Painter',
-  'Performance Artist',
-  'Photographer',
-  'Poet',
-  'Printmaker',
-  'Sculptor',
-  'Set Designer',
-  'Street Artist',
-  'Tattoo Artist',
-  'Textile Artist',
-  'Video Artist',
-  'Videographer',
-  'Visual Artist',
-  'Voice Artist',
-  'Writer',
-];
-
 export const CITIES_BY_COUNTRY: Record<string, string[]> = {
   'Afghanistan': ['KABUL', 'KANDAHAR', 'HERAT', 'MAZAR-I-SHARIF', 'JALALABAD', 'KUNDUZ', 'GHAZNI', 'BALKH'],
   'Albania': ['TIRANA', 'DURRES', 'VLORE', 'SHKODER', 'FIER', 'ELBASAN', 'KORCE', 'BERAT'],
@@ -81,9 +12,12 @@ export const CITIES_BY_COUNTRY: Record<string, string[]> = {
   ],
   'Armenia': ['YEREVAN', 'GYUMRI', 'VANADZOR', 'VAGHARSHAPAT', 'HRAZDAN', 'ABOVYAN', 'KAPAN', 'GAVAR'],
   'Australia': [
-    'SYDNEY', 'MELBOURNE', 'BRISBANE', 'PERTH', 'ADELAIDE', 'GOLD COAST', 'NEWCASTLE', 'CANBERRA',
-    'SUNSHINE COAST', 'WOLLONGONG', 'GEELONG', 'HOBART', 'TOWNSVILLE', 'CAIRNS', 'DARWIN',
-    'TOOWOOMBA', 'BALLARAT', 'BENDIGO', 'LAUNCESTON', 'MACKAY',
+    'ADELAIDE', 'ALBANY', 'ALBURY', 'ALICE SPRINGS', 'ARMIDALE', 'BALLARAT', 'BATHURST', 'BENDIGO', 'BRISBANE', 
+    'BROKEN HILL', 'BUNBURY', 'BUNDABERG', 'BURNIE', 'BUSSELTON', 'CAIRNS', 'CANBERRA', 'COFFS HARBOUR', 'DARWIN', 
+    'DEVONPORT', 'DUBBO', 'GEELONG', 'GLADSTONE', 'GOLD COAST', 'GOULBURN', 'HOBART', 'KALGOORLIE', 'LAUNCESTON', 'LISMORE', 
+    'MACKAY', 'MELBOURNE', 'MILDURA', 'MOUNT GAMBIER', 'NEWCASTLE', 'NOWRA', 'ORANGE', 'PERTH', 'PORT AUGUSTA', 'PORT HEDLAND', 
+    'PORT LINCOLN', 'ROCKHAMPTON', 'SHEPPARTON', 'SUNSHINE COAST', 'SYDNEY', 'TAMWORTH', 'TOWNSVILLE', 'TOOWOOMBA', 'WAGGA WAGGA', 
+    'WARRNAMBOOL', 'WOLLONGONG'
   ],
   'Austria': ['VIENNA', 'GRAZ', 'LINZ', 'SALZBURG', 'INNSBRUCK', 'KLAGENFURT', 'VILLACH', 'WELS', 'ST. POLTEN', 'DORNBIRN'],
   'Azerbaijan': ['BAKU', 'GANJA', 'SUMQAYIT', 'MINGACHEVIR', 'NAKHCHIVAN', 'SHIRVAN', 'LANKARAN', 'SHAKI'],
@@ -112,9 +46,18 @@ export const CITIES_BY_COUNTRY: Record<string, string[]> = {
   'Cambodia': ['PHNOM PENH', 'SIEM REAP', 'SIHANOUKVILLE', 'BATTAMBANG', 'KAMPONG CHAM', 'KAMPOT', 'TAKEO', 'PURSAT'],
   'Cameroon': ['YAOUNDE', 'DOUALA', 'GAROUA', 'BAMENDA', 'MAROUA', 'BAFOUSSAM', 'NGAOUNDERE', 'BERTOUA'],
   'Canada': [
-    'TORONTO', 'MONTREAL', 'VANCOUVER', 'CALGARY', 'EDMONTON', 'OTTAWA', 'WINNIPEG', 'QUEBEC CITY',
-    'HAMILTON', 'KITCHENER', 'LONDON', 'VICTORIA', 'HALIFAX', 'SASKATOON', 'REGINA',
-    'KELOWNA', 'BARRIE', 'ABBOTSFORD', 'SUDBURY', 'WINDSOR',
+    'ABBOTSFORD', 'AJAX', 'BANFF', 'BARRIE', 'BATHURST', 'BAY ROBERTS', 'BEAUPORT', 'BÉCANCOUR', 'BELLEVILLE', 'BLAINVILLE', 
+    'BOWMANVILLE', 'BRAMPTON', 'BRANDON', 'BRANTFORD', 'BROCKVILLE', 'BROSSARD', 'BURNABY', 'BURLINGTON', 'CALGARY', 'CAMBRIDGE', 'CANMORE',
+    'CAMPBELL RIVER', 'CHARLOTTETOWN', 'CHATHAM', 'CHICOUTIMI', 'COBOURG', 'COCHRANE', 'COLLINGWOOD', 'COQUITLAM', 'CORNWALL', 
+    'COURTENAY', 'CRANBROOK', 'DAWSON CREEK', 'DELTA', 'DRUMMONDVILLE', 'EDMONTON', 'FORT MCMURRAY', 'FORT ST. JOHN', 'FREDERICTON', 
+    'GANDER', 'GATINEAU', 'GEORGETOWN', 'GRANDE PRAIRIE', 'GRANBY', 'GUELPH', 'HALIFAX', 'HAMILTON', 'KAMLOOPS', 'KELOWNA', 'KINGSTON',
+    'KITCHENER', 'LANGFORD', 'LANGLEY', 'LEDUC', 'LETHBRIDGE', 'LLOYDMINSTER', 'LONDON', 'LONGUEUIL', 'MARKHAM', 'MEDICINE HAT',
+    'MISSISSAUGA', 'MONCTON', 'MONTREAL', 'MOOSE JAW', 'NANAIMO', 'NEWMARKET', 'NIAGARA FALLS', 'NORTH BAY', 'NORTH VANCOUVER',
+    'OAKVILLE', 'ORILLIA', 'OSHAWA', 'OTTAWA', 'PENTICTON', 'PETERBOROUGH', 'PRINCE ALBERT', 'PRINCE GEORGE', 'QUEBEC CITY',
+    'RED DEER', 'REGINA', 'REPENTIGNY', 'RICHMOND', 'RICHMOND HILL', 'RIMOUSKI', 'SAINT JOHN', 'SAINT-HYACINTHE', 'SAINT-JÉRÔME',
+    'SARNIA', 'SASKATOON', 'SAULT STE. MARIE', 'SHERBROOKE', 'ST. ALBERT', 'ST. CATHARINES', 'ST. JOHN’S', 'ST. THOMAS', 'STRATFORD',
+    'SUDBURY', 'SURREY', 'SYDNEY', 'THUNDER BAY', 'TORONTO', 'TROIS-RIVIÈRES', 'VANCOUVER', 'VAUGHAN', 'VERNON', 'VICTORIA', 'WATERLOO',
+    'WHISTLER', 'WHITEHORSE', 'WINDSOR', 'WINNIPEG', 'YELLOWKNIFE'
   ],
   'Central African Republic': ['BANGUI', 'BIMBO', 'MBAIKI', 'BERBERATI', 'KAGA-BANDORO', 'BOSSANGOA', 'BAMBARI', 'BOUAR'],
   'Chad': ['N\'DJAMENA', 'MOUNDOU', 'SARH', 'ABECHE', 'KELO', 'KOUMRA', 'PALA', 'AM TIMAN'],
@@ -329,10 +272,31 @@ export const CITIES_BY_COUNTRY: Record<string, string[]> = {
     'NEWCASTLE', 'BRIGHTON', 'HULL', 'PLYMOUTH', 'DERBY',
   ],
   'United States': [
-    'NEW YORK', 'LOS ANGELES', 'CHICAGO', 'HOUSTON', 'PHOENIX', 'PHILADELPHIA', 'SAN ANTONIO', 'SAN DIEGO',
-    'DALLAS', 'SAN JOSE', 'AUSTIN', 'JACKSONVILLE', 'FORT WORTH', 'COLUMBUS', 'CHARLOTTE',
-    'INDIANAPOLIS', 'SAN FRANCISCO', 'SEATTLE', 'DENVER', 'NASHVILLE',
-    'MIAMI', 'ATLANTA', 'BOSTON', 'DETROIT', 'PORTLAND',
+   'ABILENE', 'AKRON', 'ALBANY', 'ALBUQUERQUE', 'ALEXANDRIA', 'ALLENTOWN', 'AMARILLO', 'ANAHEIM', 'ANCHORAGE', 'ANN ARBOR',
+  'ANTIOCH', 'APPLETON', 'ARLINGTON', 'ARLINGTON HEIGHTS', 'ASHEVILLE', 'ATHENS', 'ATLANTA', 'AUGUSTA', 'AURORA', 'AUSTIN', 
+  'BAKERSFIELD', 'BALTIMORE', 'BARNSTABLE', 'BATON ROUGE', 'BEAUMONT', 'BELLEVUE', 'BERKELEY', 'BETHESDA', 'BILLINGS', 'BIRMINGHAM', 
+  'BLOOMINGTON', 'BOISE', 'BOSTON', 'BOULDER', 'BRADENTON', 'BRIDGEPORT', 'BROOKLYN', 'BUFFALO', 'BURBANK', 'CAMBRIDGE', 'CANTON', 
+  'CAPE CORAL', 'CARLSBAD', 'CARY', 'CEDAR RAPIDS', 'CHANDLER', 'CHAPEL HILL', 'CHARLESTON', 'CHARLOTTE', 'CHATTANOOGA', 'CHEYENNE', 
+  'CHICAGO', 'CHULA VISTA', 'CINCINNATI', 'CLEARWATER', 'CLEVELAND', 'COLORADO SPRINGS', 'COLUMBIA', 'COLUMBUS', 'CONCORD', 'CORPUS CHRISTI', 
+  'COSTA MESA', 'DALLAS', 'DAVENPORT', 'DAYTON', 'DENTON', 'DENVER', 'DES MOINES', 'DETROIT', 'DULUTH', 'DURHAM', 'EL PASO', 
+  'ELK GROVE', 'ERIE', 'ESCONDIDO', 'EUGENE', 'EVANSVILLE', 'FAIRBANKS', 'FARGO', 'FAYETTEVILLE', 'FLAGSTAFF', 'FLINT', 'FORT COLLINS', 
+  'FORT LAUDERDALE', 'FORT MYERS', 'FORT WAYNE', 'FORT WORTH', 'FREMONT', 'FRESNO', 'FRISCO', 'GAINESVILLE', 'GALVESTON', 
+  'GARLAND', 'GILBERT', 'GLENDALE', 'GRAND PRAIRIE', 'GRAND RAPIDS', 'GREEN BAY', 'GREENSBORO', 'GREENVILLE', 'GULFPORT', 
+  'HARRISBURG', 'HARTFORD', 'HENDERSON', 'HIALEAH', 'HOBOKEN', 'HOLLYWOOD', 'HONOLULU', 'HOUSTON', 'HUNTINGTON BEACH', 
+  'HUNTSVILLE', 'INDIANAPOLIS', 'IRVINE', 'IRVING', 'ITHACA', 'JACKSON', 'JACKSONVILLE', 'JERSEY CITY', 'JOHNS CREEK', 
+  'KALAMAZOO', 'KANSAS CITY', 'KNOXVILLE', 'LAFAYETTE', 'LAKELAND', 'LANCASTER', 'LANSING', 'LAREDO', 'LAS CRUCES', 'LAS VEGAS', 
+  'LEXINGTON', 'LINCOLN', 'LITTLE ROCK', 'LONG BEACH', 'LONG ISLAND CITY', 'LOS ANGELES', 'LOUISVILLE', 'LUBBOCK', 'MACON', 
+  'MADISON', 'MANCHESTER', 'MCALLEN', 'MEMPHIS', 'MESA', 'MESQUITE', 'MIAMI', 'MIDLAND', 'MILWAUKEE', 'MINNEAPOLIS', 'MOBILE', 
+  'MODESTO', 'MONTGOMERY', 'MURFREESBORO', 'NAPERVILLE', 'NASHVILLE', 'NEW HAVEN', 'NEW ORLEANS', 'NEW YORK', 'NEWARK', 
+  'NEWPORT BEACH', 'NORFOLK', 'NORMAN', 'OAKLAND', 'OCEANSIDE', 'ODESSA', 'OKLAHOMA CITY', 'OMAHA', 'ONTARIO', 'ORLANDO', 
+  'OXNARD', 'PALM SPRINGS', 'PALO ALTO', 'PASADENA', 'PEORIA', 'PHILADELPHIA', 'PHOENIX', 'PITTSBURGH', 'PLANO', 'POMONA', 
+  'PORTLAND', 'PROVIDENCE', 'PROVO', 'QUEENS', 'RALEIGH', 'REDDING', 'RENO', 'RICHMOND', 'RIVERSIDE', 'ROCHESTER', 'ROCKFORD', 
+  'SACRAMENTO', 'SAINT PAUL', 'SALEM', 'SALINAS', 'SALT LAKE CITY', 'SAN ANTONIO', 'SAN BERNARDINO', 'SAN DIEGO', 'SAN FRANCISCO', 
+  'SAN JOSE', 'SAN LUIS OBISPO', 'SANTA ANA', 'SANTA BARBARA', 'SANTA CLARITA', 'SANTA FE', 'SANTA MONICA', 'SANTA ROSA', 'SARASOTA', 
+  'SAVANNAH', 'SCOTTSDALE', 'SCRANTON', 'SEATTLE', 'SHREVEPORT', 'SIOUX FALLS', 'SOUTH BEND', 'SPOKANE', 'SPRINGFIELD', 'ST. AUGUSTINE', 
+  'ST. GEORGE', 'ST. LOUIS', 'ST. PETERSBURG', 'STAMFORD', 'STATE COLLEGE', 'STOCKTON', 'SYRACUSE', 'TACOMA', 'TALLAHASSEE', 'TAMPA', 
+  'TEMPE', 'TOLEDO', 'TOPEKA', 'TRENTON', 'TUCSON', 'TULSA', 'TYLER', 'VIRGINIA BEACH', 'WACO', 'WASHINGTON', 'WEST PALM BEACH', 'WICHITA', 
+  'WILMINGTON', 'WINSTON-SALEM', 'WORCESTER', 'YONKERS'
   ],
   'Uruguay': ['MONTEVIDEO', 'SALTO', 'CIUDAD DE LA COSTA', 'PAYSANDU', 'LAS PIEDRAS', 'RIVERA', 'MALDONADO', 'TACUAREMBO'],
   'Uzbekistan': ['TASHKENT', 'NAMANGAN', 'SAMARKAND', 'ANDIJAN', 'FERGANA', 'NUKUS', 'BUKHARA', 'KARSHI', 'KOKAND', 'MARGILAN'],
@@ -346,70 +310,142 @@ export const CITIES_BY_COUNTRY: Record<string, string[]> = {
 };
 
 export const DISCIPLINES: string[] = [
-  'Visual Artist',
+  // Most searched first
+  'Photographer',
   'Musician',
+  'Videographer',
+  'Model',
+  'Dancer',
+  'Filmmaker',
+  'Visual Artist',
+  'Graphic Designer',
+  'Muralist',
+  'Actor',
+  'DJ',
+  'Tattoo Artist',
+  'Fashion Designer',
+  'Animator',
+  'Illustrator',
+  'Writer',
+  'Chef',
+  'Makeup Artist',
+  'Hair Stylist',
+  // Broader categories last as catch-alls
   'Performer',
-  'Literary Artist',
   'Craftsperson',
-  'Culinary Artist',
   'Interdisciplinary Artist',
-  'Wellness & Community Arts',
 ];
 
 export const ART_TYPES_BY_DISCIPLINE: Record<string, string[]> = {
-  'Visual Artist': [
-    'Painter','Illustrator','Cartoonist','Comic Artist','Muralist','Street Artist',
-    'Graffiti Artist','Sculptor','Ceramic Artist','Potter','Glass Artist',
-    'Textile Artist','Fiber Artist','Printmaker','Collage Artist','Mixed Media Artist',
-    'Installation Artist','Conceptual Artist','Calligrapher','Tattoo Artist',
-    'Jewelry Designer','Fashion Designer','Costume Designer','Interior Designer',
-    'Furniture Designer','Floral Designer','Graphic Designer','Web Designer',
-    'Industrial Designer','Product Designer','Motion Designer','Typographer',
-    'Animator','3D Artist','Digital Artist','Pixel Artist','Game Artist',
-    'Video Artist','Projection Artist','NFT Artist','Photographer',
-    'Portrait Photographer','Wedding Photographer','Documentary Photographer',
-    'Food Photographer','Fashion Photographer','Architectural Photographer',
-    'Filmmaker','Director','Cinematographer','Videographer','Video Editor',
-    'Drone Videographer','Set Designer','Production Designer',
+  'Photographer': [
+    'Portrait Photographer','Fashion Photographer','Documentary Photographer',
+    'Event Photographer','Wedding Photographer','Music Photographer',
+    'Food Photographer','Product Photographer','Commercial Photographer',
+    'Architectural Photographer','Analog Photographer','Photo Retoucher',
   ],
   'Musician': [
-    'Singer','Songwriter','Composer','Producer','DJ','Beatmaker','Rapper',
-    'Spoken Word Artist','Musician','Multi-Instrumentalist','Pianist','Guitarist',
-    'Bassist','Drummer','Violinist','Cellist','Saxophonist','Trumpet Player',
-    'Trombone Player','Clarinetist','Flutist','Harpist','Percussionist',
-    'Quran Reciter','Vocalist','Choir Singer','Opera Singer','Sound Designer',
-    'Audio Engineer','Mixing Engineer','Mastering Engineer',
+    'Singer','Songwriter','Composer','Producer','Beatmaker','Multi-Instrumentalist',
+    'Pianist','Guitarist','Bassist','Drummer','Violinist','Cellist',
+    'Saxophonist','Trumpet Player','Percussionist','Vocalist',
+    'Choir Singer','Opera Singer','Sound Designer','Audio Engineer',
+    'Mixing Engineer','Mastering Engineer',
+  ],
+  'Videographer': [
+    'Videographer','Director','Cinematographer','Camera Operator',
+    'Video Editor','Documentary Videographer','Event Videographer',
+    'Music Video Director','Drone Videographer','Motion Graphics Editor',
+    'Colorist','Livestream Producer',
+  ],
+  'Model': [
+    'Fashion Model','Runway Model','Commercial Model','Editorial Model',
+    'Fit Model','Plus-Size Model','Beauty Model','Lifestyle Model',
+    'Hand Model','Brand Ambassador',
+  ],
+  'Dancer': [
+    'Contemporary Dancer','Hip Hop Dancer','Ballet Dancer','Latin Dancer',
+    'Jazz Dancer','Choreographer','Dance Captain','Movement Director',
+    'Backup Dancer',
+  ],
+  'Filmmaker': [
+    'Director','Screenwriter','Producer','Assistant Director',
+    'Cinematographer','Editor','Gaffer','Production Designer',
+    'Set Designer','Documentary Filmmaker','Short Film Director',
+  ],
+  'Visual Artist': [
+    'Painter','Sculptor','Ceramic Artist','Mixed Media Artist',
+    'Printmaker','Installation Artist','Digital Artist','Street Artist',
+    'Calligrapher','Collage Artist','Glass Artist','Textile Artist',
+    'Fiber Artist','Conceptual Artist',
+  ],
+  'Graphic Designer': [
+    'Brand Designer','Poster Designer','Editorial Designer','Motion Designer',
+    'Packaging Designer','UI Designer','Web Designer','Type Designer',
+    'Illustrator','3D Designer',
+  ],
+  'Muralist': [
+    'Public Muralist','Street Muralist','Community Muralist',
+    'Live Painter','Lettering Artist','Large-Scale Illustrator',
+  ],
+  'Actor': [
+    'Film Actor','Theatre Actor','Voice Actor','Commercial Actor',
+    'Improviser','Musical Theatre Performer','Stunt Performer',
+  ],
+  'DJ': [
+    'Club DJ','Event DJ','Radio DJ','Turntablist','Open Format DJ',
+    'House DJ','Hip Hop DJ','Afrobeat DJ','Wedding DJ',
+  ],
+  'Tattoo Artist': [
+    'Fine Line Tattoo Artist','Traditional Tattoo Artist','Blackwork Tattoo Artist',
+    'Colour Tattoo Artist','Illustrative Tattoo Artist','Handpoke Artist',
+  ],
+  'Fashion Designer': [
+    'Womenswear Designer','Menswear Designer','Costume Designer',
+    'Textile Designer','Pattern Maker','Stylist','Accessory Designer',
+    'Jewelry Designer',
+  ],
+  'Animator': [
+    '2D Animator','3D Animator','Motion Designer','Stop Motion Animator',
+    'Character Animator','Storyboard Artist','VFX Artist',
+  ],
+  'Illustrator': [
+    'Editorial Illustrator','Children\'s Illustrator','Comic Artist',
+    'Character Designer','Concept Artist','Surface Designer',
+    'Book Cover Illustrator',
+  ],
+  'Writer': [
+    'Screenwriter','Playwright','Novelist','Poet','Copywriter',
+    'Journalist','Essayist','Spoken Word Artist','Zine Maker','Lyricist',
+  ],
+  'Chef': [
+    'Chef','Baker','Pastry Chef','Food Stylist','Caterer',
+    'Mixologist','Barista','Chocolatier',
+  ],
+  'Makeup Artist': [
+    'Bridal Makeup Artist','Editorial Makeup Artist','SFX Makeup Artist',
+    'Film Makeup Artist','Beauty Educator','Drag Makeup Artist',
+  ],
+  'Hair Stylist': [
+    'Session Stylist','Bridal Stylist','Barber','Colorist',
+    'Wig Stylist','Natural Hair Stylist',
   ],
   'Performer': [
-    'Actor','Theatre Performer','Musical Theatre Performer','Dancer',
-    'Ballet Dancer','Contemporary Dancer','Hip Hop Dancer','Choreographer',
-    'Comedian','Magician','Circus Performer','Puppeteer','Drag Performer',
-    'Performance Artist','Host','MC','Storyteller','Poet','Spoken Word Performer',
-  ],
-  'Literary Artist': [
-    'Writer','Novelist','Essayist','Poet','Playwright','Screenwriter',
-    'Journalist','Editor','Translator','Critic','Copywriter','Ghostwriter',
-    'Blogger','Columnist','Memoirist','Children\'s Author','Comic Writer','Zine Maker',
+    'Comedian','Drag Performer','Spoken Word Performer','Host',
+    'MC','Magician','Circus Performer','Puppeteer','Performance Artist',
+    'Storyteller',
   ],
   'Craftsperson': [
-    'Woodworker','Carpenter','Furniture Maker','Weaver','Embroiderer','Knitter',
-    'Crochet Artist','Leatherworker','Metalworker','Blacksmith','Candle Maker',
-    'Soap Maker','Print Artist','Bookbinder','Paper Artist','Mosaic Artist',
-    'Miniature Artist','Toy Maker','Doll Maker','Resin Artist',
-  ],
-  'Culinary Artist': [
-    'Chef','Baker','Pastry Chef','Chocolatier','Barista','Mixologist',
-    'Food Stylist','Food Artist','Cake Decorator',
+    'Woodworker','Furniture Maker','Weaver','Embroiderer','Ceramic Artist',
+    'Leatherworker','Metalworker','Candle Maker','Soap Maker',
+    'Mosaic Artist','Bookbinder','Paper Artist',
   ],
   'Interdisciplinary Artist': [
     'Multimedia Artist','Interdisciplinary Artist','Installation Artist',
     'Experience Designer','Interactive Artist','VR Artist','AR Artist',
-    'Sound Artist','Light Artist','Environmental Artist','Social Practice Artist',
-    'Community Artist','Bio Artist','AI Artist',
-  ],
-  'Wellness & Community Arts': [
-    'Art Therapist','Workshop Facilitator','Teacher','Community Organizer',
-    'Curator','Gallerist','Arts Administrator','Creative Director','Producer',
-    'Festival Organizer','Talent Booker','Residency Coordinator',
+    'Sound Artist','Light Artist','Environmental Artist','Community Artist',
+    'AI Artist',
   ],
 };
+
+export const ALL_ARTIST_TAGS: string[] = Array.from(
+  new Set(Object.values(ART_TYPES_BY_DISCIPLINE).flat())
+).sort((a, b) => a.localeCompare(b));

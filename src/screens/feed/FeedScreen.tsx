@@ -17,6 +17,7 @@ import { supabase } from '../../lib/supabase';
 import PostCard, { Post } from '../../components/PostCard';
 import OctagonalImage from '../../components/OctagonalImage';
 import BellButton from '../../components/BellButton';
+import MessageButton from '../../components/MessageButton';
 
 const MONO = Platform.select({ ios: 'Courier New', android: 'monospace' }) as string;
 const GOLD = '#f6c55a';
@@ -33,10 +34,11 @@ const TABS: { key: FeedTab; label: string }[] = [
 // ─── Header ───────────────────────────────────────────────────────────────────
 
 function FeedHeader({
-  onAvatarPress, onBellPress, avatarUri,
+  onAvatarPress, onBellPress, onMessagePress, avatarUri,
 }: {
   onAvatarPress: () => void;
   onBellPress: () => void;
+  onMessagePress: () => void;
   avatarUri: string | null;
 }) {
   return (
@@ -46,6 +48,7 @@ function FeedHeader({
         <Text style={styles.headerDot}>●</Text>
       </View>
       <View style={styles.headerRight}>
+        <MessageButton onPress={onMessagePress} />
         <BellButton onPress={onBellPress} />
         <OctagonalImage size={24} imageUri={avatarUri} onPress={onAvatarPress} />
       </View>
@@ -93,6 +96,27 @@ function SkeletonCard() {
   );
 }
 
+function sortPostsWithPinnedFirst(items: Post[]) {
+  return [...items].sort((a, b) => {
+    const pinDelta = Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned));
+    if (pinDelta !== 0) return pinDelta;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
+
+function scoreForYouPosts(items: Post[], userArtTypes: string[]): Post[] {
+  if (userArtTypes.length === 0) return sortPostsWithPinnedFirst(items);
+  const userSet = new Set(userArtTypes.map(t => t.toLowerCase()));
+  return [...items].sort((a, b) => {
+    const pinDelta = Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned));
+    if (pinDelta !== 0) return pinDelta;
+    const aScore = ((a.profiles as any)?.art_types ?? []).filter((t: string) => userSet.has(t.toLowerCase())).length;
+    const bScore = ((b.profiles as any)?.art_types ?? []).filter((t: string) => userSet.has(t.toLowerCase())).length;
+    if (bScore !== aScore) return bScore - aScore;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function FeedScreen() {
@@ -111,11 +135,14 @@ export default function FeedScreen() {
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [userProfile, setUserProfile] = useState<{
     discipline: string | null;
     city: string | null;
     country: string | null;
-  }>({ discipline: null, city: null, country: null });
+    art_types: string[];
+  }>({ discipline: null, city: null, country: null, art_types: [] });
 
   const [toast, setToast] = useState<string | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
@@ -147,7 +174,7 @@ export default function FeedScreen() {
   const fetchPostsForTab = useCallback(async (
     tab: FeedTab,
     uid: string | null,
-    profile: { discipline: string | null; city: string | null; country: string | null },
+    profile: { discipline: string | null; city: string | null; country: string | null; art_types: string[] },
     blocked: Set<string>,
   ): Promise<Post[]> => {
     let userIds: string[] | null = null;
@@ -177,14 +204,40 @@ export default function FeedScreen() {
       if (userIds.length === 0) return [];
     }
 
-    let query = supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
+    let query = supabase
+      .from('posts')
+      .select('*')
+      .order('is_pinned', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (userIds !== null) query = query.in('user_id', userIds);
 
-    if (userIds !== null) {
-      query = query.in('user_id', userIds);
+    const { data: ownedPosts, error } = await query;
+    if (error || !ownedPosts) return [];
+
+    let collaboratorPosts: any[] = [];
+    if (userIds !== null && userIds.length > 0) {
+      const { data: collaboratorRows } = await supabase
+        .from('post_collaborators')
+        .select('post_id')
+        .eq('accepted', true)
+        .in('collaborator_id', userIds);
+
+      const collaboratorPostIds = [...new Set((collaboratorRows ?? []).map((row: any) => row.post_id as string))]
+        .filter((id) => !(ownedPosts as any[]).some((post) => post.id === id));
+
+      if (collaboratorPostIds.length > 0) {
+        const { data: extraPosts } = await supabase
+          .from('posts')
+          .select('*')
+          .in('id', collaboratorPostIds)
+          .order('created_at', { ascending: false });
+        collaboratorPosts = extraPosts ?? [];
+      }
     }
 
-    const { data: postsData, error } = await query;
-    if (error || !postsData) return [];
+    const postsData = [...ownedPosts, ...collaboratorPosts]
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     // Filter blocked users
     const filtered = postsData.filter((p: any) => !blocked.has(p.user_id));
@@ -194,11 +247,13 @@ export default function FeedScreen() {
     let profileMap: Record<string, any> = {};
     if (ids.length > 0) {
       const { data: profilesData } = await supabase
-        .from('profiles').select('id, username, profile_photo_url, art_type, discipline, full_name').in('id', ids);
+        .from('profiles').select('id, username, profile_photo_url, art_type, art_types, discipline, full_name, role').in('id', ids);
       if (profilesData) profileMap = Object.fromEntries(profilesData.map((p: any) => [p.id, p]));
     }
 
-    return filtered.map((p: any) => ({ ...p, profiles: profileMap[p.user_id] ?? null })) as Post[];
+    const mapped = filtered.map((p: any) => ({ ...p, profiles: profileMap[p.user_id] ?? null })) as Post[];
+    if (tab === 'foryou') return scoreForYouPosts(mapped, profile.art_types);
+    return sortPostsWithPinnedFirst(mapped);
   }, []);
 
   // ── Load posts ───────────────────────────────────────────────────────────
@@ -222,15 +277,23 @@ export default function FeedScreen() {
       currentUserIdRef.current = uid;
 
       if (uid) {
-        const { data: prof } = await supabase.from('profiles')
-          .select('profile_photo_url, discipline, city, country').eq('id', uid).single();
-        if (prof) {
-          setAvatarUri((prof as any).profile_photo_url ?? null);
+        const [profResult, authResult] = await Promise.all([
+          supabase.from('profiles')
+            .select('profile_photo_url, discipline, city, country, role, art_types').eq('id', uid).single(),
+          supabase.auth.getUser(),
+        ]);
+        if (profResult.data) {
+          setAvatarUri((profResult.data as any).profile_photo_url ?? null);
+          setUserRole((profResult.data as any).role ?? null);
           setUserProfile({
-            discipline: (prof as any).discipline ?? null,
-            city: (prof as any).city ?? null,
-            country: (prof as any).country ?? null,
+            discipline: (profResult.data as any).discipline ?? null,
+            city: (profResult.data as any).city ?? null,
+            country: (profResult.data as any).country ?? null,
+            art_types: (profResult.data as any).art_types ?? [],
           });
+        }
+        if (authResult.data.user?.email === 'amalmakesart@gmail.com') {
+          setIsAdmin(true);
         }
         await loadSocialState(uid);
       }
@@ -243,7 +306,7 @@ export default function FeedScreen() {
           const newRow = payload.new as Post;
           if (blockedUserIds.has(newRow.user_id)) return;
           const { data } = await supabase.from('posts')
-            .select('*, profiles(username, profile_photo_url, art_type, discipline, full_name)')
+            .select('*, profiles(username, profile_photo_url, art_type, discipline, full_name, role)')
             .eq('id', newRow.id).single();
           if (data) {
             setPosts((prev) => {
@@ -304,7 +367,46 @@ export default function FeedScreen() {
       await supabase.from('likes').delete().match({ post_id: post.id, user_id: currentUserId });
     } else {
       await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
+      if (currentUserId !== post.user_id) {
+        await supabase.from('notifications').insert({
+          user_id: post.user_id,
+          type: 'post_liked',
+          actor_id: currentUserId,
+          reference_id: post.id,
+          reference_type: 'post',
+          preview_text: post.title ?? post.content?.slice(0, 40) ?? null,
+          is_read: false,
+        });
+      }
     }
+  };
+
+  const handlePin = async (post: Post) => {
+    const newPinned = !post.is_pinned;
+    setPosts((prev) => {
+      const updated = prev.map((p) => p.id === post.id ? { ...p, is_pinned: newPinned } : p);
+      return sortPostsWithPinnedFirst(updated);
+    });
+
+    const { data, error } = await supabase
+      .from('posts')
+      .update({ is_pinned: newPinned })
+      .eq('id', post.id)
+      .select('id, is_pinned')
+      .single();
+
+    if (error || !data) {
+      setPosts((prev) => sortPostsWithPinnedFirst(
+        prev.map((p) => p.id === post.id ? { ...p, is_pinned: post.is_pinned } : p)
+      ));
+      showToast('PIN UPDATE FAILED');
+      return;
+    }
+
+    setPosts((prev) => sortPostsWithPinnedFirst(
+      prev.map((p) => p.id === post.id ? { ...p, is_pinned: (data as any).is_pinned } : p)
+    ));
+    showToast(newPinned ? 'POST PINNED' : 'POST UNPINNED');
   };
 
   const handleBookmark = async (post: Post) => {
@@ -412,6 +514,7 @@ export default function FeedScreen() {
       <FeedHeader
         onAvatarPress={() => navigation.navigate('Profile')}
         onBellPress={() => navigation.navigate('Notifications')}
+        onMessagePress={() => navigation.navigate('Inbox')}
         avatarUri={avatarUri}
       />
       <TabBar active={activeTab} onChange={handleTabChange} />
@@ -440,6 +543,7 @@ export default function FeedScreen() {
                 isLiked={likedPostIds.has(item.id)}
                 isBookmarked={bookmarkedPostIds.has(item.id)}
                 isFollowing={followingUserIds.has(item.user_id)}
+                isAdmin={isAdmin}
                 onPress={() => navigation.navigate('PostDetail', { postId: item.id })}
                 onAvatarPress={() => navigation.navigate('ArtistProfile', { userId: item.user_id })}
                 onLike={() => handleLike(item)}
@@ -448,6 +552,7 @@ export default function FeedScreen() {
                 onBlock={() => handleBlock(item)}
                 onDelete={() => handleDelete(item.id)}
                 onEdit={() => navigation.navigate('NewPost', { editPost: item })}
+                onPin={() => handlePin(item)}
               />
             )}
             refreshControl={
@@ -465,9 +570,11 @@ export default function FeedScreen() {
           />
         )}
 
-        <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('NewPost')} activeOpacity={0.8}>
-          <Text style={styles.fabText}>+</Text>
-        </TouchableOpacity>
+        {userRole === 'ARTIST' || userRole === 'COLLECTIVE' ? (
+          <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('NewPost')} activeOpacity={0.8}>
+            <Text style={styles.fabText}>+</Text>
+          </TouchableOpacity>
+        ) : null}
 
         {toast ? (
           <View style={styles.toast}><Text style={styles.toastText}>{toast}</Text></View>
@@ -506,7 +613,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', position: 'relative',
   },
   tabLabel: {
-    color: '#444444', fontFamily: MONO, fontSize: 9,
+    color: '#9a9a9a', fontFamily: MONO, fontSize: 9,
     letterSpacing: 0.14, textTransform: 'uppercase',
   },
   tabLabelActive: { color: colors.white },
@@ -517,7 +624,7 @@ const styles = StyleSheet.create({
 
   // Context label
   tabContextLabel: {
-    color: '#444444', fontFamily: MONO, fontSize: 8, letterSpacing: 0.12,
+    color: '#9a9a9a', fontFamily: MONO, fontSize: 8, letterSpacing: 0.12,
     paddingHorizontal: 14, paddingVertical: 6,
     borderBottomWidth: 1, borderBottomColor: '#111111',
   },

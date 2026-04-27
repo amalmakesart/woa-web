@@ -4,6 +4,82 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+const FIRST_FEATURE = new Date('2026-07-10T00:00:00')
+
+function getTimeLeft() {
+  const diff = FIRST_FEATURE.getTime() - Date.now()
+  if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 }
+  return {
+    days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+    hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+    minutes: Math.floor((diff / (1000 * 60)) % 60),
+    seconds: Math.floor((diff / 1000) % 60),
+  }
+}
+function pad(n: number) { return String(n).padStart(2, '0') }
+
+const STEPS = [
+  { n: '01', label: 'WE TRAVEL', body: 'THE WOA CREW TRAVELS FROM VANCOUVER TO HALIFAX, FINDING ARTISTS IN EVERY CANADIAN CITY THROUGH THIS APP.' },
+  { n: '02', label: 'WE FIND YOU', body: 'ONE ARTIST PER CITY IS SELECTED. ONLY VERIFIED WOA ARTISTS ARE ELIGIBLE TO BE CHOSEN.' },
+  { n: '03', label: 'WE FILM', body: 'A SHORT DOCUMENTARY IS MADE ABOUT YOU — YOUR WORK, YOUR PRACTICE, YOUR CITY.' },
+  { n: '04', label: 'WE PUBLISH', body: 'YOUR FILM LIVES HERE IN THE FEATURES TAB, PERMANENTLY. A RECORD OF YOUR WORK FOR THE WORLD TO FIND.' },
+  { n: '05', label: 'THE REWARD', body: 'YOU RECEIVE THE WOA FEATURE BADGE AND ARE RECOMMENDED TO VENUES AND ARTS ORGANIZATIONS ACROSS CANADA.' },
+]
+
+function ComingSoon() {
+  const [time, setTime] = useState(getTimeLeft())
+  useEffect(() => {
+    const id = setInterval(() => setTime(getTimeLeft()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  return (
+    <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 20px 60px' }}>
+      <div style={{ borderBottom: '1px solid #111', paddingBottom: 24, marginBottom: 32, paddingTop: 12 }}>
+        <p style={{ fontSize: 11, color: '#888880', letterSpacing: '0.2em', marginBottom: 6 }}>MISSION</p>
+        <p style={{ fontSize: 16, fontWeight: 700, letterSpacing: '0.08em', lineHeight: 1.5 }}>FINDING TALENT IS OUR MISSION</p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginBottom: 40 }}>
+        {STEPS.map((step, i) => (
+          <div key={step.n} style={{ display: 'flex', gap: 20, paddingBottom: 28, borderLeft: i < STEPS.length - 1 ? '1px solid #1a1a1a' : 'none', marginLeft: 16, paddingLeft: 24, position: 'relative' }}>
+            <div style={{ position: 'absolute', left: -12, top: 0, width: 24, height: 24, background: '#000', border: '1px solid #333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 9, color: '#c0392b', letterSpacing: '0.1em', fontWeight: 700 }}>{step.n}</span>
+            </div>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.16em', color: '#fff', marginBottom: 6 }}>{step.label}</p>
+              <p style={{ fontSize: 11, color: '#888880', letterSpacing: '0.06em', lineHeight: 1.7 }}>{step.body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ border: '1px solid #1a1a1a', padding: '28px 20px', textAlign: 'center', marginBottom: 32 }}>
+        <p style={{ fontSize: 10, color: '#888880', letterSpacing: '0.18em', marginBottom: 20 }}>FIRST FEATURE DROPS IN</p>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          {[{ v: time.days, l: 'DAYS' }, { v: time.hours, l: 'HRS' }, { v: time.minutes, l: 'MIN' }, { v: time.seconds, l: 'SEC' }].map(({ v, l }, i, arr) => (
+            <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ textAlign: 'center' }}>
+                <span style={{ display: 'block', fontSize: 36, fontWeight: 700, letterSpacing: '0.04em', color: '#fff', lineHeight: 1 }}>{pad(v)}</span>
+                <span style={{ fontSize: 9, color: '#555', letterSpacing: '0.14em' }}>{l}</span>
+              </div>
+              {i < arr.length - 1 && <span style={{ fontSize: 28, color: '#333', marginBottom: 14 }}>:</span>}
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: 10, color: '#c0392b', letterSpacing: '0.1em' }}>JULY 10, 2026 — VANCOUVER ISLAND, BC</p>
+      </div>
+
+      <div style={{ border: '1px solid #1a1a1a', padding: '20px', textAlign: 'center' }}>
+        <p style={{ fontSize: 11, color: '#888880', letterSpacing: '0.1em', lineHeight: 1.8 }}>
+          GET VERIFIED THROUGH YOUR PROFILE TO BE ELIGIBLE TO BE FEATURED.<br />
+          <span style={{ color: '#555' }}>ONLY VERIFIED WOA ARTISTS CAN BE SELECTED.</span>
+        </p>
+      </div>
+    </div>
+  )
+}
+
 interface Feature {
   id: string
   title: string
@@ -148,9 +224,7 @@ export default function FeaturesPage() {
           LOADING...
         </div>
       ) : features.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#888880', fontSize: 11, letterSpacing: '0.1em' }}>
-          NO FEATURES YET
-        </div>
+        <ComingSoon />
       ) : (
         <>
           {/* Hero feature */}

@@ -254,7 +254,7 @@ const s = StyleSheet.create({
   },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   backArrow: { color: colors.white, fontFamily: MONO, fontSize: 28, lineHeight: 32 },
-  backLabel: { color: '#666666', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
+  backLabel: { color: '#9a9a9a', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
   topBarTitle: { flex: 1, color: colors.white, fontFamily: MONO, fontSize: 11, letterSpacing: 0.2, textAlign: 'center' },
   saveBtn: { borderWidth: 1, borderColor: colors.red, paddingHorizontal: 14, paddingVertical: 6 },
   saveBtnDisabled: { borderColor: '#333333' },
@@ -274,7 +274,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingTop: 18, paddingBottom: 14,
     borderBottomWidth: 1, borderBottomColor: '#111111',
   },
-  fieldLabel: { color: '#666666', fontFamily: MONO, fontSize: 9, letterSpacing: 0.2, marginBottom: 10 },
+  fieldLabel: { color: '#9a9a9a', fontFamily: MONO, fontSize: 9, letterSpacing: 0.2, marginBottom: 10 },
   input: {
     color: colors.white, fontFamily: MONO,
     fontSize: 12, letterSpacing: 0.1, paddingVertical: 6,
@@ -287,7 +287,7 @@ const s = StyleSheet.create({
     paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.red,
   },
   selectedArtistName: { color: colors.red, fontFamily: MONO, fontSize: 11, letterSpacing: 0.1 },
-  clearArtist: { color: '#555555', fontFamily: MONO, fontSize: 12 },
+  clearArtist: { color: '#9a9a9a', fontFamily: MONO, fontSize: 12 },
 
   artistDropdown: { borderWidth: 1, borderColor: '#1a1a1a', marginTop: 4 },
   artistRow: {
@@ -296,5 +296,5 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#111111',
   },
   artistRowName: { color: colors.white, fontFamily: MONO, fontSize: 11, letterSpacing: 0.1 },
-  artistRowType: { color: '#444444', fontFamily: MONO, fontSize: 9, letterSpacing: 0.1 },
+  artistRowType: { color: '#9a9a9a', fontFamily: MONO, fontSize: 9, letterSpacing: 0.1 },
 });

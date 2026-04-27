@@ -15,10 +15,13 @@ const MONO = Platform.select({ ios: 'Courier New', android: 'monospace' }) as st
 type NotifType =
   | 'new_message'
   | 'new_follower'
+  | 'co_post_invite'
   | 'post_liked'
   | 'post_comment'
   | 'gig_interest'
-  | 'gig_nearby';
+  | 'gig_nearby'
+  | 'project_comment'
+  | 'booking_confirmed';
 
 interface Notif {
   id: string;
@@ -37,6 +40,11 @@ interface Notif {
   gigTitle: string | null;
 }
 
+function getNotifActorProfileId(n: Pick<Notif, 'type' | 'actor_id' | 'reference_id'>): string | null {
+  if (n.type === 'new_follower') return n.actor_id ?? n.reference_id ?? null;
+  return n.actor_id ?? null;
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const m = Math.floor(diff / 60000);
@@ -51,18 +59,27 @@ function timeAgo(dateStr: string): string {
 function notifText(n: Notif): { main: string; sub: string | null } {
   const handle = n.actorUsername
     ? `@${n.actorUsername.toUpperCase()}`
-    : n.actorName?.toUpperCase() ?? 'SOMEONE';
+    : n.reference_type === 'welcome'
+      ? 'WOA'
+      : n.actorName?.toUpperCase() ?? 'SOMEONE';
 
   switch (n.type) {
     case 'new_message':
       return {
-        main: `${handle} SENT YOU A MESSAGE`,
+        main: n.reference_type === 'welcome'
+          ? 'WOA SENT YOU A WELCOME MESSAGE'
+          : `${handle} SENT YOU A MESSAGE`,
         sub: n.preview_text ?? null,
       };
     case 'new_follower':
       return {
         main: `${handle} STARTED FOLLOWING YOU`,
         sub: null,
+      };
+    case 'co_post_invite':
+      return {
+        main: `${handle} CO-POSTED WITH YOU`,
+        sub: n.preview_text ?? 'TAP TO OPEN THE POST',
       };
     case 'post_liked':
       return {
@@ -84,9 +101,29 @@ function notifText(n: Notif): { main: string; sub: string | null } {
         main: 'NEW GIG POSTED NEAR YOU',
         sub: n.gigTitle ?? n.preview_text ?? null,
       };
+    case 'project_comment':
+      return {
+        main: `${handle} COMMENTED ON YOUR PROJECT`,
+        sub: n.preview_text ?? null,
+      };
+    case 'booking_confirmed':
+      return {
+        main: `${handle} CONFIRMED A BOOKING`,
+        sub: n.gigTitle ?? n.preview_text ?? null,
+      };
     default:
       return { main: 'NEW NOTIFICATION', sub: null };
   }
+}
+
+function notificationSignature(n: Pick<Notif, 'type' | 'actor_id' | 'reference_id' | 'reference_type' | 'preview_text'>) {
+  return [
+    n.type ?? '',
+    n.actor_id ?? '',
+    n.reference_id ?? '',
+    n.reference_type ?? '',
+    n.preview_text ?? '',
+  ].join('|');
 }
 
 export default function NotificationsScreen() {
@@ -114,8 +151,16 @@ export default function NotificationsScreen() {
 
     if (!raw || raw.length === 0) { setNotifs([]); setLoading(false); return; }
 
+    const dedupedRaw = (raw as any[]).filter((notif, index, list) => (
+      index === list.findIndex((candidate) => notificationSignature(candidate) === notificationSignature(notif))
+    ));
+
     // Fetch actor profiles
-    const actorIds = [...new Set((raw as any[]).filter(n => n.actor_id).map((n: any) => n.actor_id))];
+    const actorIds = [...new Set(
+      dedupedRaw
+        .map((n: any) => getNotifActorProfileId(n))
+        .filter(Boolean)
+    )] as string[];
     const profileMap: Record<string, any> = {};
     if (actorIds.length > 0) {
       const { data: profiles } = await supabase
@@ -127,8 +172,8 @@ export default function NotificationsScreen() {
 
     // Fetch gig titles for gig notifications
     const gigIds = [...new Set(
-      (raw as any[])
-        .filter(n => (n.type === 'gig_interest' || n.type === 'gig_nearby') && n.reference_id)
+      dedupedRaw
+        .filter(n => (n.type === 'gig_interest' || n.type === 'gig_nearby' || n.type === 'booking_confirmed') && n.reference_id)
         .map((n: any) => n.reference_id)
     )];
     const gigMap: Record<string, string> = {};
@@ -138,8 +183,9 @@ export default function NotificationsScreen() {
       (gigs ?? []).forEach((g: any) => { gigMap[g.id] = g.title; });
     }
 
-    const enriched: Notif[] = (raw as any[]).map(n => {
-      const actor = n.actor_id ? profileMap[n.actor_id] : null;
+    const enriched: Notif[] = dedupedRaw.map(n => {
+      const actorProfileId = getNotifActorProfileId(n);
+      const actor = actorProfileId ? profileMap[actorProfileId] : null;
       return {
         ...n,
         actorName: actor?.full_name ?? actor?.username ?? null,
@@ -172,13 +218,32 @@ export default function NotificationsScreen() {
     return () => clearTimeout(markTimer);
   }, [loadData, markAllRead]));
 
-  const handleTap = (n: Notif) => {
+  const handleTap = async (n: Notif) => {
     switch (n.type) {
       case 'new_message':
-        navigation.navigate('Inbox');
+        if (n.reference_type === 'welcome') {
+          navigation.navigate('WelcomeMessage', { body: n.preview_text ?? '' });
+        } else {
+          navigation.navigate('Inbox');
+        }
         break;
       case 'new_follower':
-        if (n.actor_id) navigation.navigate('ArtistProfile', { userId: n.actor_id });
+        if (getNotifActorProfileId(n)) {
+          navigation.navigate('ArtistProfile', { userId: getNotifActorProfileId(n) });
+        }
+        break;
+      case 'co_post_invite':
+        if (n.reference_id) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase
+              .from('post_collaborators')
+              .update({ accepted: true })
+              .eq('post_id', n.reference_id)
+              .eq('collaborator_id', user.id);
+          }
+          navigation.navigate('PostDetail', { postId: n.reference_id });
+        }
         break;
       case 'post_liked':
       case 'post_comment':
@@ -191,6 +256,12 @@ export default function NotificationsScreen() {
         break;
       case 'gig_nearby':
         if (n.reference_id) navigation.navigate('GigDetail', { gigId: n.reference_id });
+        break;
+      case 'project_comment':
+        if (n.reference_id) navigation.navigate('ProjectDetail', { projectId: n.reference_id });
+        break;
+      case 'booking_confirmed':
+        navigation.navigate('Inbox');
         break;
     }
   };
@@ -271,7 +342,7 @@ const s = StyleSheet.create({
   backBtn: { marginRight: 10, padding: 4 },
   backArrow: { color: colors.white, fontFamily: MONO, fontSize: 28, lineHeight: 32 },
   topBarTitle: { flex: 1, color: colors.white, fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
-  markAllRead: { color: '#555555', fontFamily: MONO, fontSize: 7, letterSpacing: 0.15 },
+  markAllRead: { color: '#b5b5b5', fontFamily: MONO, fontSize: 10, letterSpacing: 0.15 },
 
   row: {
     flexDirection: 'row', alignItems: 'center',
@@ -289,18 +360,18 @@ const s = StyleSheet.create({
   },
   rowInfo: { flex: 1 },
   mainText: {
-    color: '#666666',
-    fontFamily: MONO, fontSize: 8,
-    letterSpacing: 0.1, lineHeight: 13,
+    color: '#b5b5b5',
+    fontFamily: MONO, fontSize: 11,
+    letterSpacing: 0.1, lineHeight: 17,
   },
   handleText: { color: colors.white },
   subText: {
-    color: '#444444', fontFamily: MONO,
-    fontSize: 6, letterSpacing: 0.08, marginTop: 3,
+    color: '#9a9a9a', fontFamily: MONO,
+    fontSize: 10, letterSpacing: 0.08, marginTop: 3,
   },
-  timestamp: { color: '#333333', fontFamily: MONO, fontSize: 6, letterSpacing: 0.1 },
+  timestamp: { color: '#b5b5b5', fontFamily: MONO, fontSize: 10, letterSpacing: 0.1 },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   emptyTitle: { color: colors.white, fontFamily: MONO, fontSize: 11, letterSpacing: 0.3 },
-  emptySub: { color: '#444444', fontFamily: MONO, fontSize: 8, letterSpacing: 0.12 },
+  emptySub: { color: '#b5b5b5', fontFamily: MONO, fontSize: 10, letterSpacing: 0.12 },
 });

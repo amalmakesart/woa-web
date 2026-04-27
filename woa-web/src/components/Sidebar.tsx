@@ -12,7 +12,6 @@ const NAV = [
   { href: '/artists', label: 'ARTISTS' },
   { href: '/gigs', label: 'GIGS' },
   { href: '/projects', label: 'COLLAB' },
-  { href: '/search', label: 'SEARCH' },
   { href: '/features', label: 'FEATURES' },
   { href: '/messages', label: 'MESSAGES' },
   { href: '/notifications', label: 'NOTIFICATIONS' },

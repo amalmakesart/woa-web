@@ -5,20 +5,40 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
+  Image,
 } from 'react-native';
 import { colors } from '../constants/colors';
 
 const MONO = Platform.select({ ios: 'Courier New', android: 'monospace' });
+const RED = '#c0392b';
 
 export const GIG_ART_TYPES = [
-  'Musician',
-  'Visual Artist',
   'Photographer',
-  'Illustrator',
-  'Sculptor',
+  'Videographer',
+  'Filmmaker',
+  'Musician',
+  'Singer',
+  'DJ',
+  'Producer',
+  'Model',
+  'Actor',
   'Dancer',
-  'Writer',
+  'Choreographer',
+  'Visual Artist',
+  'Painter',
+  'Illustrator',
+  'Graphic Designer',
   'Animator',
+  'Muralist',
+  'Sculptor',
+  'Tattoo Artist',
+  'Fashion Designer',
+  'Makeup Artist',
+  'Hair Stylist',
+  'Writer',
+  'Chef',
+  'Performer',
+  'Interdisciplinary Artist',
   'Other',
 ];
 
@@ -28,6 +48,7 @@ export interface Gig {
   title: string;
   description: string | null;
   art_type: string | null;
+  image_url?: string | null;
   location: string | null;
   date_timeframe: string | null;
   budget_min: number | null;
@@ -53,17 +74,15 @@ export function formatBudget(min: number | null, max: number | null): string {
 }
 
 export default function GigCard({ gig, onPress }: GigCardProps) {
-  const meta = [gig.art_type, gig.location, gig.date_timeframe]
-    .filter(Boolean)
-    .join(' · ')
-    .toUpperCase();
-
   return (
     <TouchableOpacity
       style={[styles.card, gig.is_featured && styles.cardFeatured]}
       onPress={onPress}
       activeOpacity={0.8}
     >
+      {gig.image_url ? (
+        <Image source={{ uri: gig.image_url }} style={styles.image} resizeMode="cover" />
+      ) : null}
       {gig.is_featured && (
         <View style={styles.featuredBadge}>
           <Text style={styles.featuredText}>FEATURED</Text>
@@ -72,12 +91,36 @@ export default function GigCard({ gig, onPress }: GigCardProps) {
       <Text style={styles.title} numberOfLines={2}>
         {gig.title.toUpperCase()}
       </Text>
-      {gig.company_name ? (
-        <Text style={styles.companyName} numberOfLines={1}>
-          {gig.company_name.toUpperCase()}
-        </Text>
+      {(gig.company_name || gig.art_type || gig.location || gig.date_timeframe) ? (
+        <View style={styles.infoBox}>
+          {gig.company_name ? (
+            <Text style={styles.companyName} numberOfLines={1}>
+              {gig.company_name.toUpperCase()}
+            </Text>
+          ) : null}
+          {gig.art_type ? (
+            <Text style={styles.metaType} numberOfLines={1}>
+              {gig.art_type.toUpperCase()}
+            </Text>
+          ) : null}
+          {gig.location ? (
+            <View style={styles.metaRow}>
+              <Text style={styles.metaIcon}>⌖</Text>
+              <Text style={styles.metaText} numberOfLines={1}>
+                {gig.location.toUpperCase()}
+              </Text>
+            </View>
+          ) : null}
+          {gig.date_timeframe ? (
+            <View style={styles.metaRow}>
+              <Text style={styles.metaIcon}>◷</Text>
+              <Text style={styles.metaText} numberOfLines={2}>
+                {gig.date_timeframe.toUpperCase()}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       ) : null}
-      <Text style={styles.meta} numberOfLines={1}>{meta}</Text>
       <View style={styles.bottom}>
         <Text style={styles.budget}>
           {formatBudget(gig.budget_min, gig.budget_max)}
@@ -94,63 +137,101 @@ export default function GigCard({ gig, onPress }: GigCardProps) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.black,
-    borderBottomWidth: 1,
-    borderBottomColor: '#111111',
-    paddingHorizontal: 14,
-    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#242424',
+    marginHorizontal: 14,
+    marginTop: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    minHeight: 196,
   },
   cardFeatured: {
-    borderLeftWidth: 2,
-    borderLeftColor: colors.red,
-    paddingLeft: 12,
+    borderColor: RED,
+  },
+  image: {
+    width: '100%',
+    height: 180,
+    marginBottom: 16,
+    backgroundColor: '#0d0d0d',
   },
   featuredBadge: {
     position: 'absolute',
-    top: 16,
-    right: 14,
+    top: 30,
+    right: 28,
     backgroundColor: '#0f0000',
     borderWidth: 1,
-    borderColor: colors.red,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    borderColor: RED,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    zIndex: 2,
   },
   featuredText: {
-    color: colors.red,
+    color: RED,
     fontFamily: MONO,
-    fontSize: 8,
+    fontSize: 11,
     letterSpacing: 0.12,
   },
   title: {
     color: colors.white,
     fontFamily: MONO,
-    fontSize: 14,
+    fontSize: 18,
     letterSpacing: 0.14,
-    marginBottom: 3,
-    paddingRight: 80,
+    marginBottom: 12,
+    paddingRight: 92,
+  },
+  infoBox: {
+    borderWidth: 1,
+    borderColor: '#1f1f1f',
+    backgroundColor: '#080808',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
   },
   companyName: {
-    color: '#666666',
+    color: colors.white,
     fontFamily: MONO,
-    fontSize: 7,
+    fontSize: 11,
     letterSpacing: 0.1,
-    marginBottom: 5,
+    marginBottom: 8,
   },
-  meta: {
-    color: '#555555',
+  metaType: {
+    color: RED,
     fontFamily: MONO,
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 0.12,
-    marginBottom: 10,
+    marginBottom: 8,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 6,
+  },
+  metaIcon: {
+    color: RED,
+    fontFamily: MONO,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 1,
+  },
+  metaText: {
+    flex: 1,
+    color: '#9a9a9a',
+    fontFamily: MONO,
+    fontSize: 11,
+    letterSpacing: 0.12,
+    lineHeight: 16,
   },
   bottom: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 4,
   },
   budget: {
     color: colors.white,
     fontFamily: MONO,
-    fontSize: 14,
+    fontSize: 16,
     letterSpacing: 0.12,
   },
   interestRow: {
@@ -158,14 +239,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   interestCount: {
-    color: colors.red,
+    color: RED,
     fontFamily: MONO,
-    fontSize: 10,
+    fontSize: 11,
   },
   interestLabel: {
-    color: '#555555',
+    color: '#9a9a9a',
     fontFamily: MONO,
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 0.1,
   },
 });

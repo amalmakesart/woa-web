@@ -56,13 +56,26 @@ function timeAgo(dateStr: string) {
   return Math.floor(d / 7) + 'W'
 }
 
+function CommentIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 17 17" fill="none" style={{ display: 'block' }}>
+      <rect x="1" y="1" width="15" height="11" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" />
+      <path d="M4 15l3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function PostCard({
   post,
   currentUserId,
   likedIds,
   bookmarkedIds,
+  followingIds,
   onLike,
   onBookmark,
+  onFollow,
+  onShare,
+  onBlock,
   onEdit,
   onDelete,
   onReport,
@@ -74,8 +87,12 @@ function PostCard({
   currentUserId: string | null
   likedIds: Set<string>
   bookmarkedIds: Set<string>
+  followingIds: Set<string>
   onLike: (id: string) => void
   onBookmark: (id: string) => void
+  onFollow: (authorId: string) => void
+  onShare: (post: Post) => void
+  onBlock: (authorId: string) => void
   onEdit: (post: Post) => void
   onDelete: (post: Post) => void
   onReport: (post: Post) => void
@@ -85,6 +102,7 @@ function PostCard({
 }) {
   const isLiked = likedIds.has(post.id)
   const isBookmarked = bookmarkedIds.has(post.id)
+  const isFollowing = followingIds.has(post.user_id)
   const profile = post.profiles
   const canManage = currentUserId === post.user_id || isAdmin
   const collaboratorNames = (post.collaborators ?? [])
@@ -175,6 +193,10 @@ function PostCard({
             onDelete={() => onDelete(post)}
             onReport={() => onReport(post)}
             onPin={() => onPin(post)}
+            onShare={() => onShare(post)}
+            onFollow={currentUserId && !canManage ? () => onFollow(post.user_id) : undefined}
+            onBlock={currentUserId && !canManage ? () => onBlock(post.user_id) : undefined}
+            isFollowing={isFollowing}
           />
         </div>
       </div>
@@ -267,53 +289,36 @@ function PostCard({
       )}
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 22, alignItems: 'center', paddingTop: 4 }}>
         <button
           onClick={() => currentUserId ? onLike(post.id) : onSignUp()}
           style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
+            background: 'none', border: 'none', cursor: 'pointer',
             color: isLiked ? '#c0392b' : '#888880',
-            fontSize: 11,
-            letterSpacing: '0.1em',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            fontFamily: 'inherit',
-            transition: 'color 0.2s',
+            fontSize: 20, display: 'flex', alignItems: 'center', gap: 7,
+            fontFamily: 'inherit', transition: 'color 0.2s', padding: 0,
           }}
         >
-          <span>{isLiked ? '♥' : '♡'}</span>
-          <span>{post.like_count}</span>
+          <span style={{ lineHeight: 1 }}>{isLiked ? '♥' : '♡'}</span>
+          <span style={{ fontSize: 12, letterSpacing: '0.06em' }}>{post.like_count}</span>
         </button>
         <Link
           href={`/feed/${post.id}`}
           style={{
-            color: '#888880',
-            fontSize: 11,
-            letterSpacing: '0.1em',
-            textDecoration: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
+            color: '#888880', textDecoration: 'none',
+            display: 'flex', alignItems: 'center', gap: 7,
           }}
         >
-          <span>◻</span>
-          <span>{post.comment_count}</span>
+          <CommentIcon />
+          <span style={{ fontSize: 12, letterSpacing: '0.06em' }}>{post.comment_count}</span>
         </Link>
         <button
           onClick={() => currentUserId ? onBookmark(post.id) : onSignUp()}
           style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
+            background: 'none', border: 'none', cursor: 'pointer',
             color: isBookmarked ? '#f39c12' : '#888880',
-            fontSize: 13,
-            letterSpacing: '0.1em',
-            fontFamily: 'inherit',
-            marginLeft: 'auto',
-            transition: 'color 0.2s',
+            fontSize: 20, fontFamily: 'inherit', marginLeft: 'auto',
+            transition: 'color 0.2s', lineHeight: 1, padding: 0,
           }}
           title={isBookmarked ? 'Remove bookmark' : 'Save post'}
         >
@@ -334,6 +339,7 @@ export default function FeedPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set())
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set())
   const [showSignUp, setShowSignUp] = useState(false)
 
   const loadFeed = useCallback(async (activeTab: FeedTab) => {
@@ -406,12 +412,15 @@ export default function FeedPage() {
 
       if (user && posts.length > 0) {
         const postIds = posts.map(p => p.id)
-        const [{ data: likes }, { data: bookmarks }] = await Promise.all([
+        const authorIds = [...new Set(posts.map(p => p.user_id))]
+        const [{ data: likes }, { data: bookmarks }, { data: follows }] = await Promise.all([
           supabase.from('likes').select('post_id').eq('user_id', user.id).in('post_id', postIds),
           supabase.from('bookmarks').select('post_id').eq('user_id', user.id).in('post_id', postIds),
+          supabase.from('follows').select('following_id').eq('follower_id', user.id).in('following_id', authorIds),
         ])
         setLikedIds(new Set((likes ?? []).map((l: any) => l.post_id)))
         setBookmarkedIds(new Set((bookmarks ?? []).map((b: any) => b.post_id)))
+        setFollowingIds(new Set((follows ?? []).map((f: any) => f.following_id)))
       }
     } catch (e) {
       console.error('Failed to load feed:', e)
@@ -508,6 +517,39 @@ export default function FeedPage() {
     window.alert(`REPORTED @${post.profiles?.username?.toUpperCase() ?? 'USER'} — THANK YOU.`)
   }
 
+  async function handleFollow(authorId: string) {
+    if (!currentUserId) return
+    const supabase = createClient()
+    const isFollowing = followingIds.has(authorId)
+    setFollowingIds(prev => {
+      const next = new Set(prev)
+      isFollowing ? next.delete(authorId) : next.add(authorId)
+      return next
+    })
+    if (isFollowing) {
+      await supabase.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', authorId)
+    } else {
+      await supabase.from('follows').insert({ follower_id: currentUserId, following_id: authorId })
+    }
+  }
+
+  function handleShare(post: Post) {
+    const url = `${window.location.origin}/feed/${post.id}`
+    if (navigator.share) {
+      navigator.share({ title: post.title ?? 'WOA Post', url })
+    } else {
+      navigator.clipboard.writeText(url).then(() => window.alert('LINK COPIED TO CLIPBOARD'))
+    }
+  }
+
+  async function handleBlock(authorId: string) {
+    if (!currentUserId) return
+    if (!window.confirm('BLOCK THIS USER? THEY WILL NOT BE ABLE TO SEE YOUR PROFILE.')) return
+    const supabase = createClient()
+    await supabase.from('blocks').insert({ blocker_id: currentUserId, blocked_id: authorId })
+    setPosts(prev => prev.filter(p => p.user_id !== authorId))
+  }
+
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 20px' }}>
       {/* Header */}
@@ -583,8 +625,12 @@ export default function FeedPage() {
             currentUserId={currentUserId}
             likedIds={likedIds}
             bookmarkedIds={bookmarkedIds}
+            followingIds={followingIds}
             onLike={handleLike}
             onBookmark={handleBookmark}
+            onFollow={handleFollow}
+            onShare={handleShare}
+            onBlock={handleBlock}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onReport={handleReport}

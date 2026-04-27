@@ -141,13 +141,6 @@ export default function ConversationPage() {
       is_read: false,
     })
 
-    const col = currentUserRole === 'GIG_POSTER' ? 'artist_unread' : 'gig_poster_unread'
-    await supabase.from('conversations').update({
-      last_message: content,
-      last_message_at: new Date().toISOString(),
-      [col]: 1,
-    }).eq('id', conversationId)
-
     setSending(false)
   }
 

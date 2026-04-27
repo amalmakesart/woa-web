@@ -91,6 +91,21 @@ export default function ExpressInterestScreen() {
       return;
     }
 
+    // Notify gig poster
+    const { data: gig } = await supabase
+      .from('gigs').select('poster_id').eq('id', gigId).single();
+    if (gig && (gig as any).poster_id && (gig as any).poster_id !== currentUserId) {
+      await supabase.from('notifications').insert({
+        user_id: (gig as any).poster_id,
+        type: 'gig_interest',
+        actor_id: currentUserId,
+        reference_id: gigId,
+        reference_type: 'gig',
+        preview_text: gigTitle ?? null,
+        is_read: false,
+      });
+    }
+
     navigation.goBack();
   };
 
@@ -225,7 +240,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 6 },
   backArrow: { color: colors.white, fontFamily: MONO, fontSize: 28, lineHeight: 32 },
-  backLabel: { color: '#666666', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
+  backLabel: { color: '#9a9a9a', fontFamily: MONO, fontSize: 13, letterSpacing: 0.18 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   notifDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.red },
 
@@ -238,20 +253,20 @@ const styles = StyleSheet.create({
     fontSize: 14, letterSpacing: 0.3, marginBottom: 10,
   },
   gigTitleSmall: {
-    color: '#888888', fontFamily: MONO,
+    color: '#b5b5b5', fontFamily: MONO,
     fontSize: 9, letterSpacing: 0.15, lineHeight: 15, marginBottom: 6,
   },
   gigMeta: {
-    color: '#444444', fontFamily: MONO,
+    color: '#9a9a9a', fontFamily: MONO,
     fontSize: 7, letterSpacing: 0.12, marginTop: 2,
   },
 
   section: {
     paddingHorizontal: 16, paddingTop: 16, paddingBottom: 0,
-    borderBottomWidth: 1, borderBottomColor: '#444444',
+    borderBottomWidth: 1, borderBottomColor: '#9a9a9a',
   },
   sectionLabel: {
-    color: '#888888', fontFamily: MONO,
+    color: '#b5b5b5', fontFamily: MONO,
     fontSize: 10, letterSpacing: 0.2, marginBottom: 12,
   },
 
@@ -271,17 +286,17 @@ const styles = StyleSheet.create({
     fontSize: 9, letterSpacing: 0.12, marginBottom: 2,
   },
   profileCity: {
-    color: '#555555', fontFamily: MONO,
+    color: '#9a9a9a', fontFamily: MONO,
     fontSize: 8, letterSpacing: 0.1,
   },
 
   feeInputRow: {
     flexDirection: 'row', alignItems: 'center',
-    borderBottomWidth: 1, borderBottomColor: '#444444',
+    borderBottomWidth: 1, borderBottomColor: '#9a9a9a',
     paddingBottom: 14,
   },
   dollarSign: {
-    color: '#888888', fontFamily: MONO,
+    color: '#b5b5b5', fontFamily: MONO,
     fontSize: 16, paddingRight: 10,
   },
   feeInput: {
@@ -289,7 +304,7 @@ const styles = StyleSheet.create({
     fontSize: 16, letterSpacing: 0.1,
   },
   fieldNote: {
-    color: '#444444', fontFamily: MONO,
+    color: '#9a9a9a', fontFamily: MONO,
     fontSize: 7, letterSpacing: 0.1, marginBottom: 14,
   },
 
@@ -302,7 +317,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   charCount: {
-    color: '#333333', fontFamily: MONO,
+    color: '#8f8f8f', fontFamily: MONO,
     fontSize: 6, letterSpacing: 0.1,
     textAlign: 'right', marginBottom: 14,
   },
@@ -314,11 +329,11 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   privacyTitle: {
-    color: '#444444', fontFamily: MONO,
+    color: '#9a9a9a', fontFamily: MONO,
     fontSize: 6, letterSpacing: 0.2, marginBottom: 8,
   },
   privacyText: {
-    color: '#333333', fontFamily: MONO,
+    color: '#8f8f8f', fontFamily: MONO,
     fontSize: 6, letterSpacing: 0.08, lineHeight: 11,
   },
 

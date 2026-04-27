@@ -57,11 +57,11 @@ export default function InboxScreen() {
     setIsGigPoster(gigPoster);
     setCurrentUserAvatar((me as any)?.profile_photo_url ?? null);
 
-    const idColumn = gigPoster ? 'gig_poster_id' : 'artist_id';
+    // Load all conversations where the user is either participant
     const { data: convData } = await supabase
       .from('conversations')
-      .select('id, gig_poster_id, artist_id, gig_id, last_message, last_message_at, gig_poster_unread, artist_unread')
-      .eq(idColumn, user.id)
+      .select('id, gig_poster_id, artist_id, gig_id, conversation_type, last_message, last_message_at, gig_poster_unread, artist_unread')
+      .or(`gig_poster_id.eq.${user.id},artist_id.eq.${user.id}`)
       .order('last_message_at', { ascending: false });
 
     if (!convData || convData.length === 0) {
@@ -71,7 +71,7 @@ export default function InboxScreen() {
     }
 
     // Fetch other user profiles
-    const otherIds = (convData as any[]).map(c => gigPoster ? c.artist_id : c.gig_poster_id);
+    const otherIds = (convData as any[]).map(c => c.gig_poster_id === user.id ? c.artist_id : c.gig_poster_id);
     const uniqueIds = [...new Set(otherIds)];
     const { data: profiles } = await supabase
       .from('profiles').select('id, full_name, username, profile_photo_url').in('id', uniqueIds);
@@ -87,9 +87,10 @@ export default function InboxScreen() {
     }
 
     const enriched: Conversation[] = (convData as any[]).map(c => {
-      const otherId = gigPoster ? c.artist_id : c.gig_poster_id;
+      const isInitiator = c.gig_poster_id === user.id;
+      const otherId = isInitiator ? c.artist_id : c.gig_poster_id;
       const other = profileMap[otherId] ?? {};
-      const unread = gigPoster ? (c.gig_poster_unread ?? 0) : (c.artist_unread ?? 0);
+      const unread = isInitiator ? (c.gig_poster_unread ?? 0) : (c.artist_unread ?? 0);
       return {
         ...c,
         otherUserId: otherId,
@@ -132,6 +133,8 @@ export default function InboxScreen() {
         <View style={s.rowInfo}>
           {item.gigTitle ? (
             <Text style={s.gigLabel} numberOfLines={1}>RE: {item.gigTitle.toUpperCase()}</Text>
+          ) : (item as any).conversation_type === 'direct' ? (
+            <Text style={s.directLabel}>DIRECT MESSAGE</Text>
           ) : null}
           <Text style={s.otherName} numberOfLines={1}>
             {(item.otherUserName ?? 'UNKNOWN').toUpperCase()}
@@ -178,7 +181,7 @@ export default function InboxScreen() {
           <Text style={s.emptyTitle}>NO MESSAGES YET</Text>
           <Text style={s.emptySub}>
             {isGigPoster
-              ? 'MESSAGE ARTISTS FROM THE GIGS TAB'
+              ? 'MESSAGE ARTISTS FROM YOUR GIG APPLICANTS'
               : 'GIG POSTERS WILL CONTACT YOU HERE'}
           </Text>
         </View>
@@ -215,26 +218,27 @@ const s = StyleSheet.create({
     gap: 12,
   },
   rowInfo: { flex: 1 },
-  gigLabel: { color: '#333333', fontFamily: MONO, fontSize: 6, letterSpacing: 0.12, marginBottom: 2 },
-  otherName: { color: colors.white, fontFamily: MONO, fontSize: 9, letterSpacing: 0.12, marginBottom: 2 },
-  otherHandle: { color: colors.red, fontFamily: MONO, fontSize: 7, letterSpacing: 0.12, marginBottom: 3 },
-  preview: { color: '#555555', fontFamily: MONO, fontSize: 7, letterSpacing: 0.06 },
+  gigLabel: { color: '#9a9a9a', fontFamily: MONO, fontSize: 10, letterSpacing: 0.12, marginBottom: 2 },
+  directLabel: { color: '#2a7a4f', fontFamily: MONO, fontSize: 9, letterSpacing: 0.15, marginBottom: 2 },
+  otherName: { color: colors.white, fontFamily: MONO, fontSize: 12, letterSpacing: 0.12, marginBottom: 2 },
+  otherHandle: { color: colors.red, fontFamily: MONO, fontSize: 10, letterSpacing: 0.12, marginBottom: 3 },
+  preview: { color: '#777777', fontFamily: MONO, fontSize: 10, letterSpacing: 0.06 },
 
   rowRight: { alignItems: 'flex-end', gap: 6 },
-  timestamp: { color: '#333333', fontFamily: MONO, fontSize: 6, letterSpacing: 0.1 },
+  timestamp: { color: '#9a9a9a', fontFamily: MONO, fontSize: 10, letterSpacing: 0.1 },
   badge: {
     backgroundColor: colors.red, borderRadius: 7,
     minWidth: 14, height: 14,
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 3,
   },
-  badgeText: { color: colors.white, fontFamily: MONO, fontSize: 7 },
+  badgeText: { color: colors.white, fontFamily: MONO, fontSize: 9 },
 
   skeletonRow: {
     height: 60, backgroundColor: '#0a0a0a',
     borderBottomWidth: 1, borderBottomColor: '#111111',
   },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 32 },
-  emptyTitle: { color: colors.white, fontFamily: MONO, fontSize: 11, letterSpacing: 0.3 },
-  emptySub: { color: '#444444', fontFamily: MONO, fontSize: 8, letterSpacing: 0.12, textAlign: 'center' },
+  emptyTitle: { color: colors.white, fontFamily: MONO, fontSize: 12, letterSpacing: 0.3 },
+  emptySub: { color: '#9a9a9a', fontFamily: MONO, fontSize: 10, letterSpacing: 0.12, textAlign: 'center' },
 });
