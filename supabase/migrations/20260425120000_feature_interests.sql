@@ -23,4 +23,4 @@ drop policy if exists "Admins can view all interests" on public.feature_interest
 create policy "Admins can view all interests"
   on public.feature_interests for select
   to authenticated
-  using (public.is_admin());
+  using (public.is_woa_admin());
