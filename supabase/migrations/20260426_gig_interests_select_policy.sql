@@ -5,7 +5,7 @@ alter table public.gig_interests enable row level security;
 
 drop policy if exists "gig_interests_select_own" on public.gig_interests;
 create policy "gig_interests_select_own" on public.gig_interests
-  for select using (auth.uid() = user_id);
+  for select using (auth.uid() = artist_id);
 
 drop policy if exists "gig_interests_select_poster" on public.gig_interests;
 create policy "gig_interests_select_poster" on public.gig_interests
@@ -15,8 +15,8 @@ create policy "gig_interests_select_poster" on public.gig_interests
 
 drop policy if exists "gig_interests_insert_own" on public.gig_interests;
 create policy "gig_interests_insert_own" on public.gig_interests
-  for insert with check (auth.uid() = user_id);
+  for insert with check (auth.uid() = artist_id);
 
 drop policy if exists "gig_interests_delete_own" on public.gig_interests;
 create policy "gig_interests_delete_own" on public.gig_interests
-  for delete using (auth.uid() = user_id);
+  for delete using (auth.uid() = artist_id);
