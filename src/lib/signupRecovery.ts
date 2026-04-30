@@ -21,6 +21,11 @@ function readString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function normalizeCity(value: unknown) {
+  const city = readString(value).toUpperCase();
+  return city || '';
+}
+
 function readStringArray(value: unknown) {
   return Array.isArray(value) ? value.map((item) => readString(item)).filter(Boolean) : [];
 }
@@ -154,7 +159,7 @@ export async function completePendingSignupExperience() {
     updateData.country = metadataCountry;
   }
 
-  const metadataCity = readString(metadata.city);
+  const metadataCity = normalizeCity(metadata.city);
   if (!readString(profile?.city) && metadataCity) {
     updateData.city = metadataCity;
   }

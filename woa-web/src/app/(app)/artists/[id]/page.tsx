@@ -87,6 +87,35 @@ interface FollowUser {
   is_verified: boolean
 }
 
+function PostGridMedia({ type, mediaUrl, title }: { type: string; mediaUrl: string | null; title: string | null }) {
+  if (type === 'image' && mediaUrl) {
+    return <img src={mediaUrl} alt={title ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+  }
+
+  if (type === 'video' && mediaUrl) {
+    return (
+      <>
+        <video
+          src={mediaUrl}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          muted
+          playsInline
+          preload="metadata"
+        />
+        <div style={{ position: 'absolute', right: 8, bottom: 8, width: 24, height: 24, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, pointerEvents: 'none' }}>
+          ▷
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888880', fontSize: 24 }}>
+      {type === 'audio' ? '♪' : '◻'}
+    </div>
+  )
+}
+
 export default function ArtistProfilePage() {
   const params = useParams()
   const router = useRouter()
@@ -483,13 +512,7 @@ export default function ArtistProfilePage() {
             {posts.map(post => (
               <Link key={post.id} href={`/feed/${post.id}`} style={{ textDecoration: 'none', display: 'block' }}>
                 <div style={{ aspectRatio: '1/1', background: '#111', position: 'relative', overflow: 'hidden' }} className="post-thumb-hover">
-                  {post.media_url && post.type === 'image' ? (
-                    <img src={post.media_url} alt={post.title ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888880', fontSize: 24 }}>
-                      {post.type === 'video' ? '▷' : post.type === 'audio' ? '♪' : '◻'}
-                    </div>
-                  )}
+                  <PostGridMedia type={post.type} mediaUrl={post.media_url} title={post.title} />
                   <div className="post-thumb-overlay" style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'none', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#fff', letterSpacing: '0.08em', gap: 12 }}>
                     <span>♥ {post.like_count}</span>
                   </div>
@@ -521,14 +544,8 @@ export default function ArtistProfilePage() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2 }}>
                     {section.items.map(item => (
                       <Link key={item.id} href={`/feed/${item.post_id}`} style={{ textDecoration: 'none' }}>
-                        <div style={{ aspectRatio: '1/1', background: '#111', overflow: 'hidden' }}>
-                          {item.posts?.media_url && item.posts.type === 'image' ? (
-                            <img src={item.posts.media_url} alt={item.posts.title ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888880', fontSize: 24 }}>
-                              {item.posts?.type === 'video' ? '▷' : item.posts?.type === 'audio' ? '♪' : '◻'}
-                            </div>
-                          )}
+                        <div style={{ aspectRatio: '1/1', background: '#111', overflow: 'hidden', position: 'relative' }}>
+                          <PostGridMedia type={item.posts?.type ?? ''} mediaUrl={item.posts?.media_url ?? null} title={item.posts?.title ?? null} />
                         </div>
                       </Link>
                     ))}

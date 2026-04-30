@@ -9,10 +9,18 @@ export function buildPostShareUrl(postId: string) {
   return `${WEBSITE_URL}/feed/${postId}`;
 }
 
+export function buildGigShareUrl(gigId: string) {
+  return `${WEBSITE_URL}/gigs/${gigId}`;
+}
+
 export function buildProfileDeepLink(profileId: string) {
   return `workerofart://profile/${profileId}`;
 }
 
 export function buildPostDeepLink(postId: string) {
   return `workerofart://post/${postId}`;
+}
+
+export function buildGigDeepLink(gigId: string) {
+  return `workerofart://gig/${gigId}`;
 }

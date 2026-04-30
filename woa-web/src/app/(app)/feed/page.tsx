@@ -475,6 +475,32 @@ export default function FeedPage() {
 
   useEffect(() => { loadFeed(tab) }, [tab, loadFeed])
 
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase.channel(`web-feed-${tab}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
+        const updated = payload.new as Post
+        setPosts(prev => prev.map(post => (
+          post.id === updated.id
+            ? { ...post, ...updated, profiles: post.profiles, collaborators: post.collaborators }
+            : post
+        )))
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, () => {
+        void loadFeed(tab)
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
+        const deleted = payload.old as { id?: string }
+        if (!deleted.id) return
+        setPosts(prev => prev.filter(post => post.id !== deleted.id))
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [tab, loadFeed])
+
   async function handleBookmark(postId: string) {
     if (!currentUserId) return
     const supabase = createClient()

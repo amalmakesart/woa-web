@@ -29,6 +29,35 @@ interface Post {
   created_at: string
 }
 
+function PostGridMedia({ type, mediaUrl, title }: { type: string; mediaUrl: string | null; title: string | null }) {
+  if (type === 'image' && mediaUrl) {
+    return <img src={mediaUrl} alt={title ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.85)' }} />
+  }
+
+  if (type === 'video' && mediaUrl) {
+    return (
+      <>
+        <video
+          src={mediaUrl}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          muted
+          playsInline
+          preload="metadata"
+        />
+        <div style={{ position: 'absolute', right: 8, bottom: 8, width: 24, height: 24, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, pointerEvents: 'none' }}>
+          ▷
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888880', fontSize: 24 }}>
+      {type === 'audio' ? '♪' : '◻'}
+    </div>
+  )
+}
+
 function getMenu(role: string | null) {
   const r = (role ?? '').toUpperCase()
   const first = r === 'GIG_POSTER'
@@ -234,13 +263,7 @@ export default function ProfilePage() {
             {posts.map(post => (
               <Link key={post.id} href={`/feed/${post.id}`} style={{ textDecoration: 'none' }}>
                 <div style={{ aspectRatio: '1/1', background: '#111', position: 'relative', overflow: 'hidden' }}>
-                  {post.media_url && post.type === 'image' ? (
-                    <img src={post.media_url} alt={post.title ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.85)' }} />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888880', fontSize: 24 }}>
-                      {post.type === 'video' ? '▷' : post.type === 'audio' ? '♪' : '◻'}
-                    </div>
-                  )}
+                  <PostGridMedia type={post.type} mediaUrl={post.media_url} title={post.title} />
                 </div>
               </Link>
             ))}

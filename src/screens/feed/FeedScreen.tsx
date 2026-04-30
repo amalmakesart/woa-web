@@ -121,6 +121,12 @@ function scoreForYouPosts(items: Post[], userArtTypes: string[]): Post[] {
 
 export default function FeedScreen() {
   const navigation = useNavigation<any>();
+  const EMPTY_USER_PROFILE = {
+    discipline: null,
+    city: null,
+    country: null,
+    art_types: [] as string[],
+  };
 
   const [activeTab, setActiveTab] = useState<FeedTab>('foryou');
   const [posts, setPosts] = useState<Post[]>([]);
@@ -146,6 +152,7 @@ export default function FeedScreen() {
 
   const [toast, setToast] = useState<string | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
+  const activeTabRef = useRef<FeedTab>('foryou');
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (msg: string) => {
@@ -267,87 +274,96 @@ export default function FeedScreen() {
     if (showTabLoader) setTabLoading(false);
   }, [fetchPostsForTab, blockedUserIds, userProfile]);
 
+  const refreshFeed = useCallback(async (tab: FeedTab, showTabLoader = false) => {
+    if (showTabLoader) setTabLoading(true);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const uid = user?.id ?? null;
+    currentUserIdRef.current = uid;
+    setCurrentUserId(uid);
+
+    let nextProfile = EMPTY_USER_PROFILE;
+
+    if (uid) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('profile_photo_url, discipline, city, country, role, art_types')
+        .eq('id', uid)
+        .single();
+
+      nextProfile = {
+        discipline: (profile as any)?.discipline ?? null,
+        city: (profile as any)?.city ?? null,
+        country: (profile as any)?.country ?? null,
+        art_types: (profile as any)?.art_types ?? [],
+      };
+
+      setAvatarUri((profile as any)?.profile_photo_url ?? null);
+      setUserRole((profile as any)?.role ?? null);
+      setUserProfile(nextProfile);
+      setIsAdmin(user?.email === 'amalmakesart@gmail.com');
+      await loadSocialState(uid);
+    } else {
+      setAvatarUri(null);
+      setUserRole(null);
+      setUserProfile(EMPTY_USER_PROFILE);
+      setIsAdmin(false);
+      setLikedPostIds(new Set());
+      setBookmarkedPostIds(new Set());
+      setFollowingUserIds(new Set());
+      setBlockedUserIds(new Set());
+    }
+
+    const blocked = uid
+      ? await supabase.from('blocks').select('blocked_id').eq('blocker_id', uid)
+          .then((result) => new Set((result.data ?? []).map((row: any) => row.blocked_id as string)))
+      : new Set<string>();
+
+    setBlockedUserIds(blocked);
+    setPosts(await fetchPostsForTab(tab, uid, nextProfile, blocked));
+    setLoading(false);
+    if (showTabLoader) setTabLoading(false);
+  }, [fetchPostsForTab, loadSocialState]);
+
   // ── Init on mount ────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const uid = user?.id ?? null;
-      setCurrentUserId(uid);
-      currentUserIdRef.current = uid;
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
-      if (uid) {
-        const [profResult, authResult] = await Promise.all([
-          supabase.from('profiles')
-            .select('profile_photo_url, discipline, city, country, role, art_types').eq('id', uid).single(),
-          supabase.auth.getUser(),
-        ]);
-        if (profResult.data) {
-          setAvatarUri((profResult.data as any).profile_photo_url ?? null);
-          setUserRole((profResult.data as any).role ?? null);
-          setUserProfile({
-            discipline: (profResult.data as any).discipline ?? null,
-            city: (profResult.data as any).city ?? null,
-            country: (profResult.data as any).country ?? null,
-            art_types: (profResult.data as any).art_types ?? [],
-          });
-        }
-        if (authResult.data.user?.email === 'amalmakesart@gmail.com') {
-          setIsAdmin(true);
-        }
-        await loadSocialState(uid);
-      }
-    };
-    init();
+  useEffect(() => {
+    void refreshFeed(activeTabRef.current);
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+      void refreshFeed(activeTabRef.current);
+    });
 
     const channel = supabase.channel('feed-posts')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' },
-        async (payload) => {
-          const newRow = payload.new as Post;
-          if (blockedUserIds.has(newRow.user_id)) return;
-          const { data } = await supabase.from('posts')
-            .select('*, profiles(username, profile_photo_url, art_type, discipline, full_name, role)')
-            .eq('id', newRow.id).single();
-          if (data) {
-            setPosts((prev) => {
-              if (prev.some((p) => p.id === (data as Post).id)) return prev;
-              return [data as Post, ...prev];
-            });
-          }
-        }
-      ).subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        void refreshFeed(activeTabRef.current);
+      })
+      .subscribe();
 
     return () => {
+      authListener.subscription.unsubscribe();
       supabase.removeChannel(channel);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
-  }, []);
+  }, [refreshFeed]);
 
   // ── Reload on focus ──────────────────────────────────────────────────────
 
   useFocusEffect(
     useCallback(() => {
-      const uid = currentUserIdRef.current;
-      const run = async () => {
-        const blocked = uid
-          ? await supabase.from('blocks').select('blocked_id').eq('blocker_id', uid)
-              .then(r => new Set((r.data ?? []).map((b: any) => b.blocked_id as string)))
-          : new Set<string>();
-        setBlockedUserIds(blocked);
-        const p = await fetchPostsForTab(activeTab, uid, userProfile, blocked);
-        setPosts(p);
-        if (uid) await loadSocialState(uid);
-        setLoading(false);
-      };
-      run();
-    }, [activeTab, userProfile, fetchPostsForTab, loadSocialState])
+      void refreshFeed(activeTab);
+    }, [activeTab, refreshFeed])
   );
 
   // ── Tab change ───────────────────────────────────────────────────────────
 
   const handleTabChange = (tab: FeedTab) => {
     setActiveTab(tab);
-    loadPosts(tab, true);
+    void refreshFeed(tab, true);
   };
 
   // ── Actions ──────────────────────────────────────────────────────────────
@@ -560,7 +576,7 @@ export default function FeedScreen() {
                 refreshing={refreshing}
                 onRefresh={async () => {
                   setRefreshing(true);
-                  await loadPosts(activeTab);
+                  await refreshFeed(activeTab);
                   setRefreshing(false);
                 }}
                 tintColor={colors.white}

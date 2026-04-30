@@ -52,6 +52,24 @@ function sortByRecent<T>(arr: T[]): T[] {
   return [...arr].sort((a: any, b: any) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime());
 }
 
+function normalizeCity(value: string | null | undefined) {
+  return value?.trim().toUpperCase() ?? '';
+}
+
+function uniqueNormalizedCities(values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    const normalized = normalizeCity(value);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+  }
+
+  return result.sort((a, b) => a.localeCompare(b));
+}
+
 // ─── Filter Modal ─────────────────────────────────────────────────────────────
 
 function FilterModal({
@@ -239,7 +257,7 @@ export default function ArtistsScreen() {
     const source = countryFilter
       ? allArtists.filter((a) => a.country === countryFilter)
       : allArtists;
-    return [...new Set(source.map((a) => a.city).filter(Boolean) as string[])].sort();
+    return uniqueNormalizedCities(source.map((a) => a.city));
   }, [allArtists, countryFilter]);
 
   const availableDisciplines = useMemo(() =>
@@ -318,21 +336,39 @@ export default function ArtistsScreen() {
     setCurrentUserArtTypes((profile as any)?.art_types ?? []);
   }, []);
 
-  useEffect(() => {
-    loadArtists();
-    void loadCurrentUserProfile();
+  const refreshArtists = useCallback(async () => {
+    await Promise.all([loadArtists(), loadCurrentUserProfile()]);
   }, [loadArtists, loadCurrentUserProfile]);
+
+  useEffect(() => {
+    void refreshArtists();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+      void refreshArtists();
+    });
+
+    const channel = supabase.channel('artists-directory')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        void refreshArtists();
+      })
+      .subscribe();
+
+    return () => {
+      authListener.subscription.unsubscribe();
+      supabase.removeChannel(channel);
+    };
+  }, [refreshArtists]);
 
   useFocusEffect(
     useCallback(() => {
-      void loadCurrentUserProfile();
-    }, [loadCurrentUserProfile])
+      void refreshArtists();
+    }, [refreshArtists])
   );
 
   useEffect(() => {
     let result = allArtists;
     if (countryFilter) result = result.filter((a) => a.country === countryFilter);
-    if (cityFilter) result = result.filter((a) => a.city === cityFilter);
+    if (cityFilter) result = result.filter((a) => normalizeCity(a.city) === cityFilter);
     if (disciplineFilter) result = result.filter((a) =>
       a.discipline?.toLowerCase() === disciplineFilter.toLowerCase() ||
       (a as any).art_type?.toLowerCase() === disciplineFilter.toLowerCase()

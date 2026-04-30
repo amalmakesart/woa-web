@@ -31,6 +31,13 @@ const MONO = Platform.select({ ios: 'Courier New', android: 'monospace' }) as st
 type Step = 'details' | 'review' | 'payment';
 type ValueOption = { label: string; value: string };
 type SchedulePicker = 'startDate' | 'startTime' | 'endDate' | 'endTime' | null;
+type GigPricingPreview = {
+  amount: number;
+  originalAmount: number;
+  free: boolean;
+  coupon: { code: string; source: string } | null;
+  discountDescription: string | null;
+};
 const STANDARD_PRICE = 6.00;
 const FEATURED_PRICE = 14.00;
 const OTHER_CITY = 'OTHER — TYPE BELOW';
@@ -77,6 +84,12 @@ function formatTimeLabel(value: string) {
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+function getFeaturedUntilDate(isFeatured: boolean) {
+  return isFeatured
+    ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    : null;
 }
 
 function buildDateOptions(daysAhead = 730): ValueOption[] {
@@ -256,6 +269,10 @@ export default function PostGigScreen() {
   const [budgetMin, setBudgetMin] = useState('');
   const [budgetMax, setBudgetMax] = useState('');
   const [isFeatured, setIsFeatured] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponApplying, setCouponApplying] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<GigPricingPreview | null>(null);
 
   // Location state
   const [selectedCountry, setSelectedCountry] = useState('');
@@ -319,7 +336,13 @@ export default function PostGigScreen() {
     ? `${scheduleFromLabel} — ${scheduleToLabel}`
     : scheduleFromLabel;
 
-  const totalCost = isFeatured ? FEATURED_PRICE : STANDARD_PRICE;
+  const baseAmountCents = Math.round((isFeatured ? FEATURED_PRICE : STANDARD_PRICE) * 100);
+  const totalCost = (appliedCoupon?.amount ?? baseAmountCents) / 100;
+
+  useEffect(() => {
+    setAppliedCoupon(null);
+    setCouponError(null);
+  }, [isFeatured]);
 
   const handlePickGigImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -424,10 +447,93 @@ export default function PostGigScreen() {
     else navigation.goBack();
   };
 
+  const resolveGigPricing = async (): Promise<GigPricingPreview | null> => {
+    const trimmedCoupon = couponCode.trim();
+    if (!trimmedCoupon) {
+      setAppliedCoupon(null);
+      setCouponError(null);
+      return {
+        amount: baseAmountCents,
+        originalAmount: baseAmountCents,
+        free: false,
+        coupon: null,
+        discountDescription: null,
+      };
+    }
+
+    if (
+      appliedCoupon?.coupon?.code === trimmedCoupon.toUpperCase()
+      && appliedCoupon.originalAmount === baseAmountCents
+    ) {
+      return appliedCoupon;
+    }
+
+    if (!currentUserId) {
+      setCouponError('LOG IN AGAIN TO APPLY A COUPON.');
+      return null;
+    }
+
+    setCouponApplying(true);
+    setCouponError(null);
+    const { data, error } = await supabase.functions.invoke('create-checkout', {
+      body: {
+        type: 'gig',
+        user_id: currentUserId,
+        is_featured: isFeatured,
+        coupon_code: trimmedCoupon,
+        preview_only: true,
+      },
+    });
+    setCouponApplying(false);
+
+    if (error) {
+      setAppliedCoupon(null);
+      setCouponError((error.message ?? 'COUPON COULD NOT BE APPLIED.').toUpperCase());
+      return null;
+    }
+
+    const pricing = data as GigPricingPreview | null;
+    if (!pricing) {
+      setAppliedCoupon(null);
+      setCouponError('COUPON COULD NOT BE APPLIED.');
+      return null;
+    }
+
+    const normalizedCode = pricing.coupon?.code ?? trimmedCoupon.toUpperCase();
+    const normalizedPricing = {
+      ...pricing,
+      coupon: pricing.coupon ? { ...pricing.coupon, code: normalizedCode } : null,
+    };
+
+    setCouponCode(normalizedCode);
+    setAppliedCoupon(normalizedPricing);
+    return normalizedPricing;
+  };
+
+  const handleApplyCoupon = () => {
+    void resolveGigPricing();
+  };
+
   const handleSubmit = () => {
     void (async () => {
       setSubmitting(true);
+      const pricing = await resolveGigPricing();
+      if (!pricing) {
+        setSubmitting(false);
+        return;
+      }
+
       const result = await createOrUpdatePendingGig();
+      if (pricing.free) {
+        if (result.gigId) {
+          await activatePendingGig(result.gigId);
+        } else if (result.usesLegacyPostPaymentCreate) {
+          await createGigAfterPayment();
+        }
+        setSubmitting(false);
+        return;
+      }
+
       setSubmitting(false);
       if (result.shouldOpenCheckout) {
         setShowPaymentWebView(true);
@@ -467,15 +573,15 @@ export default function PostGigScreen() {
     );
   };
 
-  const createOrUpdatePendingGig = async (): Promise<{ gigId: string | null; shouldOpenCheckout: boolean }> => {
+  const createOrUpdatePendingGig = async (): Promise<{ gigId: string | null; shouldOpenCheckout: boolean; usesLegacyPostPaymentCreate: boolean }> => {
     if (!currentUserId) {
       Alert.alert('ERROR', 'Please log in again before posting a gig.');
-      return { gigId: null, shouldOpenCheckout: false };
+      return { gigId: null, shouldOpenCheckout: false, usesLegacyPostPaymentCreate: false };
     }
     const draft = getGigDraft('payment_pending');
     const uploadedGigImage = await uploadGigImageIfNeeded();
     if (gigImageUri && !uploadedGigImage) {
-      return { gigId: null, shouldOpenCheckout: false };
+      return { gigId: null, shouldOpenCheckout: false, usesLegacyPostPaymentCreate: false };
     }
     draft.image_url = uploadedGigImage || null;
 
@@ -483,9 +589,9 @@ export default function PostGigScreen() {
       const { error } = await supabase.from('gigs').update(draft).eq('id', pendingGigId);
       if (error) {
         Alert.alert('ERROR', 'Gig draft could not be prepared for payment.');
-        return { gigId: null, shouldOpenCheckout: false };
+        return { gigId: null, shouldOpenCheckout: false, usesLegacyPostPaymentCreate: false };
       }
-      return { gigId: pendingGigId, shouldOpenCheckout: true };
+      return { gigId: pendingGigId, shouldOpenCheckout: true, usesLegacyPostPaymentCreate: false };
     }
 
     const { data, error } = await supabase
@@ -497,26 +603,30 @@ export default function PostGigScreen() {
     if (error) {
       if (isPendingStatusSchemaError(error.message ?? '')) {
         setUsesLegacyPostPaymentCreate(true);
-        return { gigId: null, shouldOpenCheckout: true };
+        return { gigId: null, shouldOpenCheckout: true, usesLegacyPostPaymentCreate: true };
       }
       Alert.alert('ERROR', 'Gig draft could not be prepared for payment.');
-      return { gigId: null, shouldOpenCheckout: false };
+      return { gigId: null, shouldOpenCheckout: false, usesLegacyPostPaymentCreate: false };
     }
 
     const gigId = (data as { id: string } | null)?.id ?? null;
     setPendingGigId(gigId);
     setUsesLegacyPostPaymentCreate(false);
-    return { gigId, shouldOpenCheckout: true };
+    return { gigId, shouldOpenCheckout: true, usesLegacyPostPaymentCreate: false };
   };
 
   const activatePendingGig = async (gigId: string) => {
     const { error } = await supabase
       .from('gigs')
-      .update({ status: 'active', is_featured: isFeatured })
+      .update({
+        status: 'active',
+        is_featured: isFeatured,
+        featured_until: getFeaturedUntilDate(isFeatured),
+      })
       .eq('id', gigId);
 
     if (error) {
-      Alert.alert('ERROR', 'Payment was received, but the gig still needs to be activated.');
+      Alert.alert('ERROR', 'The gig still needs to be activated.');
       return;
     }
 
@@ -530,12 +640,15 @@ export default function PostGigScreen() {
   const createGigAfterPayment = async () => {
     const { data, error } = await supabase
       .from('gigs')
-      .insert(getGigDraft('active'))
+      .insert({
+        ...getGigDraft('active'),
+        featured_until: getFeaturedUntilDate(isFeatured),
+      })
       .select('id')
       .single();
 
     if (error) {
-      Alert.alert('ERROR', 'Payment succeeded, but the gig could not be created automatically.');
+      Alert.alert('ERROR', 'The gig could not be created automatically.');
       return;
     }
 
@@ -873,17 +986,11 @@ export default function PostGigScreen() {
             {/* Pricing summary */}
             <View style={s.pricingBox}>
               <View style={s.pricingRow}>
-                <Text style={s.pricingLabel}>BASE LISTING</Text>
-                <Text style={s.pricingValue}>$6.00</Text>
+                <Text style={s.pricingLabel}>{isFeatured ? 'FEATURED LISTING' : 'STANDARD LISTING'}</Text>
+                <Text style={s.pricingValue}>${(baseAmountCents / 100).toFixed(2)}</Text>
               </View>
-              {isFeatured && (
-                <View style={s.pricingRow}>
-                  <Text style={s.pricingLabel}>FEATURED UPGRADE</Text>
-                  <Text style={s.pricingValue}>${FEATURED_PRICE.toFixed(2)}</Text>
-                </View>
-              )}
               <View style={[s.pricingRow, s.pricingTotal]}>
-                <Text style={s.pricingTotalLabel}>TOTAL</Text>
+                <Text style={s.pricingTotalLabel}>{appliedCoupon ? 'DISCOUNTED TOTAL' : 'TOTAL'}</Text>
                 <Text style={s.pricingTotalValue}>
                   {`$${totalCost.toFixed(2)}`}
                 </Text>
@@ -980,17 +1087,52 @@ export default function PostGigScreen() {
               </Text>
             </View>
 
+            <View style={s.field}>
+              <Text style={s.fieldLabel}>COUPON CODE</Text>
+              <View style={s.couponRow}>
+                <TextInput
+                  style={[s.textInput, s.couponInput]}
+                  placeholder="ENTER STRIPE COUPON OR PROMO CODE"
+                  placeholderTextColor="#9a9a9a"
+                  value={couponCode}
+                  onChangeText={(value) => {
+                    setCouponCode(value.toUpperCase());
+                    setCouponError(null);
+                    if (appliedCoupon && value.trim().toUpperCase() !== (appliedCoupon.coupon?.code ?? '')) {
+                      setAppliedCoupon(null);
+                    }
+                  }}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={[s.couponApplyBtn, couponApplying && s.submitBtnDisabled]}
+                  onPress={handleApplyCoupon}
+                  disabled={couponApplying}
+                  activeOpacity={0.7}
+                >
+                  <Text style={s.couponApplyText}>{couponApplying ? '...' : 'APPLY'}</Text>
+                </TouchableOpacity>
+              </View>
+              {appliedCoupon?.coupon ? (
+                <Text style={s.couponStatus}>
+                  {`${appliedCoupon.coupon.code}${appliedCoupon.discountDescription ? ` · ${appliedCoupon.discountDescription}` : ''}${appliedCoupon.free ? ' · FREE POST' : ''}`}
+                </Text>
+              ) : null}
+              {couponError ? <Text style={s.couponError}>{couponError}</Text> : null}
+            </View>
+
             <View style={s.nextSection}>
               <TouchableOpacity
                 style={[s.submitBtn, submitting && s.submitBtnDisabled]}
                 onPress={handleSubmit}
-                disabled={submitting}
+                disabled={submitting || couponApplying}
                 activeOpacity={0.7}
               >
-                {submitting ? (
+                {submitting || couponApplying ? (
                   <ActivityIndicator color={colors.black} size="small" />
                 ) : (
-                  <Text style={s.submitBtnText}>PROCEED TO PAYMENT ›</Text>
+                  <Text style={s.submitBtnText}>{appliedCoupon?.free ? 'POST GIG FREE' : 'PROCEED TO PAYMENT ›'}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1010,9 +1152,9 @@ export default function PostGigScreen() {
                 </View>
                 <WebView
                   source={{
-                    uri: `https://workerofart.com/checkout/gig.html?v=${checkoutVersion}&user_id=${currentUserId}&featured=${isFeatured}${
+                    uri: `https://workerofart.com/checkout/gig.html?v=${checkoutVersion}&user_id=${currentUserId}&featured=${isFeatured}&amount_cents=${appliedCoupon?.amount ?? baseAmountCents}${
                       pendingGigId ? `&gig_id=${pendingGigId}` : ''
-                    }`,
+                    }${couponCode.trim() ? `&coupon_code=${encodeURIComponent(couponCode.trim())}` : ''}`,
                   }}
                   style={{ flex: 1 }}
                   cacheEnabled={false}
@@ -1315,6 +1457,20 @@ const s = StyleSheet.create({
   paymentSummaryLabel: { color: '#b5b5b5', fontFamily: MONO, fontSize: 11, letterSpacing: 0.2, marginBottom: 8 },
   paymentSummaryAmount: { color: colors.white, fontFamily: MONO, fontSize: 32, letterSpacing: 0.1, marginBottom: 8 },
   paymentSummaryNote: { color: '#b5b5b5', fontFamily: MONO, fontSize: 11, letterSpacing: 0.12 },
+  couponRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  couponInput: { flex: 1, marginBottom: 0 },
+  couponApplyBtn: {
+    borderWidth: 1,
+    borderColor: colors.red,
+    backgroundColor: '#120202',
+    minHeight: 50,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  couponApplyText: { color: colors.red, fontFamily: MONO, fontSize: 10, letterSpacing: 0.16 },
+  couponStatus: { color: '#b5b5b5', fontFamily: MONO, fontSize: 9, letterSpacing: 0.1, marginTop: 10 },
+  couponError: { color: colors.red, fontFamily: MONO, fontSize: 9, letterSpacing: 0.1, marginTop: 10 },
   webViewTopBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12,

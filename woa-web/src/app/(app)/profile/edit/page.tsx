@@ -39,6 +39,11 @@ const ART_TYPES_BY_DISCIPLINE: Record<string, string[]> = {
 
 const ALL_ART_TYPES = Array.from(new Set(Object.values(ART_TYPES_BY_DISCIPLINE).flat())).sort()
 
+function normalizeCity(value: string) {
+  const normalized = value.trim().toUpperCase()
+  return normalized || null
+}
+
 export default function EditProfilePage() {
   const router = useRouter()
   const [targetId, setTargetId] = useState<string | null>(null)
@@ -148,11 +153,12 @@ export default function EditProfilePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const profileId = targetId && isAdmin ? targetId : user.id
+    const normalizedCity = normalizeCity(city)
 
     const updates: Record<string, any> = {
       full_name: fullName || null,
       username: username.toLowerCase().trim() || null,
-      city: city || null,
+      city: normalizedCity,
       country: country || null,
       bio: bio || null,
       instagram: instagram || null,

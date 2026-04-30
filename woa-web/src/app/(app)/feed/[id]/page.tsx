@@ -258,7 +258,6 @@ export default function PostDetailPage() {
         .from('profiles').select('username, profile_photo_url').eq('id', currentUserId).single()
       setComments(prev => [...prev, { ...(newComment as Comment), profiles: prof as any }])
       setPost(p => p ? { ...p, comment_count: p.comment_count + 1 } : p)
-      supabase.rpc('increment_comment_count', { post_id: postId })
     }
     setSubmitting(false)
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)

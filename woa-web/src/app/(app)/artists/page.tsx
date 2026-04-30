@@ -31,6 +31,24 @@ interface Artist {
   created_at: string | null
 }
 
+function normalizeCity(value: string | null | undefined) {
+  return value?.trim().toUpperCase() ?? ''
+}
+
+function uniqueNormalizedCities(values: Array<string | null | undefined>) {
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const value of values) {
+    const normalized = normalizeCity(value)
+    if (!normalized || seen.has(normalized)) continue
+    seen.add(normalized)
+    result.push(normalized)
+  }
+
+  return result.sort((a, b) => a.localeCompare(b))
+}
+
 // ── Filter Modal (bottom sheet) ───────────────────────────────────────────────
 
 function FilterModal({
@@ -214,7 +232,7 @@ export default function ArtistsPage() {
   )
   const availableCities = useMemo(() => {
     const source = countryFilter ? allArtists.filter(a => a.country === countryFilter) : allArtists
-    return [...new Set(source.map(a => a.city).filter(Boolean) as string[])].sort()
+    return uniqueNormalizedCities(source.map(a => a.city))
   }, [allArtists, countryFilter])
   const availableDisciplines = useMemo(() =>
     DISCIPLINES.filter(d => allArtists.some(a =>
@@ -241,7 +259,7 @@ export default function ArtistsPage() {
       )
     }
     if (countryFilter) result = result.filter(a => a.country === countryFilter)
-    if (cityFilter) result = result.filter(a => a.city === cityFilter)
+    if (cityFilter) result = result.filter(a => normalizeCity(a.city) === cityFilter)
     if (disciplineFilter) result = result.filter(a =>
       a.discipline?.toLowerCase() === disciplineFilter.toLowerCase() ||
       a.art_type?.toLowerCase() === disciplineFilter.toLowerCase()
@@ -408,7 +426,7 @@ export default function ArtistsPage() {
       {/* GRID */}
       <div style={{ flex: 1, overflowY: 'auto', background: '#111' }}>
         {loading ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
+          <div className="artist-grid">
             {Array.from({ length: 12 }).map((_, i) => (
               <div key={i} style={{ aspectRatio: '1/1', background: '#1a1a1a' }} />
             ))}
@@ -422,7 +440,7 @@ export default function ArtistsPage() {
             </button>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
+          <div className="artist-grid">
             {displayed.map(artist => (
               (() => {
                 const disciplineLabel = artist.role === 'COLLECTIVE'
@@ -463,22 +481,21 @@ export default function ArtistsPage() {
                   )}
 
                   {/* Info overlay */}
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px 8px 8px', background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%)' }}>
-                    <span style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: '#fff', marginBottom: 2 }}>
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 8px 8px', background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 72%, transparent 100%)' }}>
+                    <span style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: '#fff', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {(artist.full_name ?? artist.username ?? '').toUpperCase()}
                     </span>
                     {disciplineLabel && (
-                      <span style={{ fontSize: 9, color: '#c0392b', letterSpacing: '0.08em' }}>
+                      <span style={{ display: 'block', fontSize: 8, color: '#c0392b', letterSpacing: '0.08em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {disciplineLabel.toUpperCase()}
                       </span>
                     )}
+                    {locationLabel && (
+                      <span style={{ display: 'block', fontSize: 8, color: '#f6c55a', letterSpacing: '0.06em', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {locationLabel}
+                      </span>
+                    )}
                   </div>
-
-                  {locationLabel && (
-                    <span style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 9, color: '#c0392b', letterSpacing: '0.06em' }}>
-                      {locationLabel}
-                    </span>
-                  )}
                 </div>
               </div>
                 )
@@ -523,6 +540,10 @@ export default function ArtistsPage() {
       )}
 
       <style>{`
+        .artist-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; }
+        @media (max-width: 640px) {
+          .artist-grid { grid-template-columns: repeat(2, 1fr); }
+        }
         .artist-card-hover:hover img { filter: brightness(0.55) !important; transform: scale(1.04); }
       `}</style>
     </div>

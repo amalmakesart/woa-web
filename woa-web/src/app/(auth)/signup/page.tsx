@@ -73,6 +73,20 @@ const ROLE_OPTIONS: { value: Role; label: string; description: string }[] = [
 
 const EMAIL_REDIRECT_URL = 'https://www.workerofart.com/auth/confirmed'
 
+function normalizeCity(value: string) {
+  const normalized = value.trim().toUpperCase()
+  return normalized || null
+}
+
+async function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
+}
+
 function AvatarUpload({ preview, onChange }: { preview: string | null; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
@@ -239,11 +253,13 @@ export default function SignupPage() {
     })
   }
 
-  function buildProfileData() {
+  function buildProfileData(profilePhotoUrl?: string | null) {
+    const normalizedCity = normalizeCity(city)
     const base: Record<string, any> = {
       full_name: fullName.trim(),
       username: username.toLowerCase(),
       role,
+      profile_photo_url: profilePhotoUrl ?? null,
       follower_count: 0,
       rating_count: 0,
     }
@@ -253,7 +269,7 @@ export default function SignupPage() {
         discipline,
         art_types: artTypes,
         country: country.trim() || null,
-        city: city.trim() || null,
+        city: normalizedCity,
         experience: experience || null,
         is_available: isAvailable,
         bio: bio.trim() || null,
@@ -269,7 +285,7 @@ export default function SignupPage() {
         collective_type: collectiveType,
         member_count: memberCount ? parseInt(memberCount, 10) : null,
         country: country.trim() || null,
-        city: city.trim() || null,
+        city: normalizedCity,
         bio: bio.trim() || null,
         instagram: instagram.trim() || null,
         website: website.trim() || null,
@@ -284,12 +300,16 @@ export default function SignupPage() {
   async function uploadAvatar(userId: string) {
     if (!avatarFile) return null
     const supabase = createClient()
-    const ext = avatarFile.name.split('.').pop() ?? 'jpg'
+    const ext = avatarFile.name.split('.').pop()?.toLowerCase() ?? 'jpg'
+    const contentType = avatarFile.type || (ext === 'png' ? 'image/png' : 'image/jpeg')
     const path = `${userId}/avatar.${ext}`
-    const { error: upErr } = await supabase.storage.from('avatars').upload(path, avatarFile, { upsert: true })
+    const { error: upErr } = await supabase.storage.from('avatars').upload(path, avatarFile, {
+      upsert: true,
+      contentType,
+    })
     if (upErr) return null
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
-    return urlData.publicUrl
+    return `${urlData.publicUrl}?t=${Date.now()}`
   }
 
   async function handleSubmit() {
@@ -297,11 +317,12 @@ export default function SignupPage() {
     setLoading(true)
     const supabase = createClient()
     try {
+      const avatarFallbackUrl = avatarFile ? await readFileAsDataUrl(avatarFile) : null
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: buildProfileData(),
+          data: buildProfileData(avatarFallbackUrl),
           emailRedirectTo: EMAIL_REDIRECT_URL,
         },
       })
@@ -310,11 +331,12 @@ export default function SignupPage() {
       if (!user) { setError('SIGN UP FAILED — TRY AGAIN.'); return }
 
       const avatarUrl = await uploadAvatar(user.id)
+      const profilePhotoUrl = avatarUrl ?? avatarFallbackUrl
 
       await supabase.from('profiles').upsert({
         id: user.id,
-        ...buildProfileData(),
-        profile_photo_url: avatarUrl,
+        ...buildProfileData(profilePhotoUrl),
+        profile_photo_url: profilePhotoUrl,
       })
 
       router.push('/feed')

@@ -308,13 +308,17 @@ export default function EditProfileScreen() {
       }
     }
 
-    const finalCity = city === OTHER_CITY ? customCity.trim() : city;
+    const finalCity = (city === OTHER_CITY ? customCity.trim() : city).toUpperCase();
 
     // Build update — never update username (it's locked)
     const updateData: Record<string, any> = {
       full_name: fullName.trim(),
       profile_photo_url: photoUrl,
     };
+
+    if (isGigPoster) {
+      updateData.company_name = companyName.trim() || null;
+    }
 
     if (!isGigPoster && !isArtLover) {
       updateData.bio = bio.trim();
@@ -379,6 +383,19 @@ export default function EditProfileScreen() {
                 placeholder="YOUR FULL NAME" placeholderTextColor="#9a9a9a" maxLength={80}
                 autoCapitalize="words" />
             </Field>
+            {isGigPoster ? (
+              <Field label="COMPANY / VENUE NAME">
+                <TextInput
+                  style={s.input}
+                  value={companyName}
+                  onChangeText={setCompanyName}
+                  placeholder="YOUR COMPANY OR VENUE"
+                  placeholderTextColor="#9a9a9a"
+                  maxLength={120}
+                  autoCapitalize="words"
+                />
+              </Field>
+            ) : null}
             <View style={s.saveBtnWrap}>
               <TouchableOpacity
                 style={[s.saveBtnLarge, saving && s.saveBtnDisabled]}

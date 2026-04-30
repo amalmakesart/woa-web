@@ -157,13 +157,23 @@ function InlineVideoPlayer({ uri }: { uri: string | null }) {
   useEffect(() => {
     let alive = true;
 
-    void import('expo-av')
-      .then((mod) => {
+    const loadVideo = async () => {
+      try {
+        const mod = await import('expo-av');
+        await mod.Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
         if (alive) setVideoComponent(() => mod.Video);
-      })
-      .catch(() => {
+      } catch {
         if (alive) setVideoComponent(null);
-      });
+      }
+    };
+
+    void loadVideo();
 
     if (uri) {
       void import('expo-video-thumbnails')

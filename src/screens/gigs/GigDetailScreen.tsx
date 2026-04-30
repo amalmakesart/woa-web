@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Image,
+  Share,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { colors } from '../../constants/colors';
 import { supabase } from '../../lib/supabase';
 import OctagonalImage from '../../components/OctagonalImage';
 import { Gig, formatBudget } from '../../components/GigCard';
+import { buildGigShareUrl } from '../../lib/shareLinks';
 
 const MONO = Platform.select({ ios: 'Courier New', android: 'monospace' }) as string;
 
@@ -83,6 +85,22 @@ export default function GigDetailScreen() {
   const posterName = poster?.full_name ?? poster?.username ?? 'UNKNOWN';
   const isArtist = currentUserRole === 'ARTIST';
   const isOwnGig = currentUserId === gig?.poster_id;
+
+  const handleShareGig = async () => {
+    if (!gig) return;
+    const url = buildGigShareUrl(gig.id);
+    const detailLine = [gig.art_type, gig.location].filter(Boolean).join(' · ');
+
+    try {
+      await Share.share({
+        title: gig.title,
+        url,
+        message: [`Apply to ${gig.title} on WORK(ER) OF ART.`, detailLine, url].filter(Boolean).join('\n'),
+      });
+    } catch {
+      // Ignore cancellations from the native share sheet.
+    }
+  };
 
   if (loading) {
     return (
@@ -202,6 +220,14 @@ export default function GigDetailScreen() {
         <View style={styles.interestBox}>
           <Text style={styles.interestNumber}>{interestCount}</Text>
           <Text style={styles.interestLabel}>ARTISTS INTERESTED</Text>
+        </View>
+
+        <View style={styles.actionSection}>
+          <TouchableOpacity style={styles.shareBtn} onPress={handleShareGig} activeOpacity={0.7}>
+            <Ionicons name="share-social-outline" size={16} color={colors.white} />
+            <Text style={styles.shareBtnText}>SHARE GIG</Text>
+          </TouchableOpacity>
+          <Text style={styles.interestNote}>INVITE ARTISTS TO APPLY WITH THE SHARE LINK</Text>
         </View>
 
         {/* EXPRESS INTEREST */}
@@ -372,6 +398,22 @@ const styles = StyleSheet.create({
 
   // Action
   actionSection: { paddingHorizontal: 16, paddingTop: 24 },
+  shareBtn: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: '#222222',
+    backgroundColor: '#111111',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  shareBtnText: {
+    color: colors.white,
+    fontFamily: MONO,
+    fontSize: 11,
+    letterSpacing: 0.18,
+  },
   interestBtn: {
     borderWidth: 1, borderColor: colors.red,
     height: 52, alignItems: 'center', justifyContent: 'center',

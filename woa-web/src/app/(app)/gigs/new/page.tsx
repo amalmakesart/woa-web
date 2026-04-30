@@ -40,6 +40,13 @@ const COUNTRIES = [
 ]
 
 type Step = 'details' | 'review' | 'payment'
+type GigPricingPreview = {
+  amount: number
+  originalAmount: number
+  free: boolean
+  coupon: { code: string; source: string } | null
+  discountDescription: string | null
+}
 
 function formatDate(val: string) {
   if (!val) return ''
@@ -50,6 +57,12 @@ function formatTime(val: string) {
   const [h, m] = val.split(':').map(Number)
   const d = new Date(); d.setHours(h, m, 0, 0)
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toUpperCase()
+}
+
+function getFeaturedUntilDate(isFeatured: boolean) {
+  return isFeatured
+    ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    : null
 }
 
 // ── Main Page ──────────────────────────────────────────────────────────────
@@ -87,6 +100,10 @@ export default function PostGigPage() {
   const [budgetMin, setBudgetMin] = useState('')
   const [budgetMax, setBudgetMax] = useState('')
   const [isFeatured, setIsFeatured] = useState(false)
+  const [couponCode, setCouponCode] = useState('')
+  const [couponApplying, setCouponApplying] = useState(false)
+  const [couponError, setCouponError] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<GigPricingPreview | null>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -153,7 +170,11 @@ export default function PostGigPage() {
           setPaymentSuccess(true)
           if (pendingGigId) {
             const supabase = createClient()
-            supabase.from('gigs').update({ status: 'active', is_featured: isFeatured }).eq('id', pendingGigId)
+            supabase.from('gigs').update({
+              status: 'active',
+              is_featured: isFeatured,
+              featured_until: getFeaturedUntilDate(isFeatured),
+            }).eq('id', pendingGigId)
               .then(() => { setTimeout(() => router.push('/gigs'), 2000) })
           } else {
             setTimeout(() => router.push('/gigs'), 2000)
@@ -179,7 +200,13 @@ export default function PostGigPage() {
     return from
   }, [startDate, startTime, endDate, endTime])
 
-  const totalCost = isFeatured ? FEATURED_PRICE + STANDARD_PRICE : STANDARD_PRICE
+  const baseAmountCents = Math.round((isFeatured ? FEATURED_PRICE : STANDARD_PRICE) * 100)
+  const totalCost = (appliedCoupon?.amount ?? baseAmountCents) / 100
+
+  useEffect(() => {
+    setAppliedCoupon(null)
+    setCouponError('')
+  }, [isFeatured])
 
   function validate() {
     if (!title.trim()) { setError('GIG TITLE IS REQUIRED'); return false }
@@ -227,10 +254,79 @@ export default function PostGigPage() {
     return urlData.publicUrl
   }
 
+  async function resolveGigPricing(): Promise<GigPricingPreview | null> {
+    const trimmedCoupon = couponCode.trim()
+    if (!trimmedCoupon) {
+      setAppliedCoupon(null)
+      setCouponError('')
+      return {
+        amount: baseAmountCents,
+        originalAmount: baseAmountCents,
+        free: false,
+        coupon: null,
+        discountDescription: null,
+      }
+    }
+
+    if (
+      appliedCoupon?.coupon?.code === trimmedCoupon.toUpperCase()
+      && appliedCoupon.originalAmount === baseAmountCents
+    ) {
+      return appliedCoupon
+    }
+
+    if (!currentUserId) {
+      setCouponError('LOG IN AGAIN TO APPLY A COUPON.')
+      return null
+    }
+
+    setCouponApplying(true)
+    setCouponError('')
+    const supabase = createClient()
+    const { data, error } = await supabase.functions.invoke('create-checkout', {
+      body: {
+        type: 'gig',
+        user_id: currentUserId,
+        is_featured: isFeatured,
+        coupon_code: trimmedCoupon,
+        preview_only: true,
+      },
+    })
+    setCouponApplying(false)
+
+    if (error) {
+      setAppliedCoupon(null)
+      setCouponError((error.message ?? 'COUPON COULD NOT BE APPLIED.').toUpperCase())
+      return null
+    }
+
+    const pricing = data as GigPricingPreview | null
+    if (!pricing) {
+      setAppliedCoupon(null)
+      setCouponError('COUPON COULD NOT BE APPLIED.')
+      return null
+    }
+
+    const normalizedCode = pricing.coupon?.code ?? trimmedCoupon.toUpperCase()
+    const normalizedPricing = {
+      ...pricing,
+      coupon: pricing.coupon ? { ...pricing.coupon, code: normalizedCode } : null,
+    }
+
+    setCouponCode(normalizedCode)
+    setAppliedCoupon(normalizedPricing)
+    return normalizedPricing
+  }
+
   async function handleProceedToPayment() {
     if (!currentUserId) return
     setSubmitting(true)
     setError('')
+    const pricing = await resolveGigPricing()
+    if (!pricing) {
+      setSubmitting(false)
+      return
+    }
 
     const imageUrl = await uploadImageIfNeeded()
 
@@ -255,6 +351,7 @@ export default function PostGigPage() {
     }
 
     const supabase = createClient()
+    let nextGigId = pendingGigId
 
     if (pendingGigId) {
       await supabase.from('gigs').update(draft).eq('id', pendingGigId)
@@ -266,8 +363,26 @@ export default function PostGigPage() {
         if (!activeErr) { router.push('/gigs'); return }
         setError(insertErr.message); setSubmitting(false); return
       }
-      if (data) setPendingGigId((data as any).id)
+      if (data) {
+        nextGigId = (data as any).id
+        setPendingGigId(nextGigId)
+      }
     }
+
+    if (pricing.free) {
+      if (nextGigId) {
+        await supabase.from('gigs').update({
+          status: 'active',
+          is_featured: isFeatured,
+          featured_until: getFeaturedUntilDate(isFeatured),
+        }).eq('id', nextGigId)
+      }
+      setPaymentSuccess(true)
+      setSubmitting(false)
+      setTimeout(() => router.push('/gigs'), 2000)
+      return
+    }
+
     setSubmitting(false)
   }
 
@@ -494,17 +609,11 @@ export default function PostGigPage() {
           {/* Pricing summary */}
           <div style={{ background: '#0a0a0a', border: '1px solid #1a1a1a', padding: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #111' }}>
-              <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.1em' }}>BASE LISTING</span>
-              <span style={{ fontSize: 10, color: '#fff', letterSpacing: '0.06em' }}>${STANDARD_PRICE.toFixed(2)}</span>
+              <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.1em' }}>{isFeatured ? 'FEATURED LISTING' : 'STANDARD LISTING'}</span>
+              <span style={{ fontSize: 10, color: '#fff', letterSpacing: '0.06em' }}>${(baseAmountCents / 100).toFixed(2)}</span>
             </div>
-            {isFeatured && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #111' }}>
-                <span style={{ fontSize: 10, color: '#888880', letterSpacing: '0.1em' }}>FEATURED UPGRADE</span>
-                <span style={{ fontSize: 10, color: '#c0392b', letterSpacing: '0.06em' }}>${FEATURED_PRICE.toFixed(2)}</span>
-              </div>
-            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em' }}>TOTAL</span>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em' }}>{appliedCoupon ? 'DISCOUNTED TOTAL' : 'TOTAL'}</span>
               <span style={{ fontSize: 14, fontWeight: 700, color: '#c0392b' }}>${totalCost.toFixed(2)}</span>
             </div>
           </div>
@@ -597,6 +706,43 @@ export default function PostGigPage() {
             <span style={{ fontSize: 28, fontWeight: 700, color: '#c0392b' }}>${totalCost.toFixed(2)}</span>
           </div>
 
+          <div>
+            <label className="woa-input-label">COUPON CODE</label>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input
+                className="woa-input"
+                value={couponCode}
+                onChange={e => {
+                  const value = e.target.value.toUpperCase()
+                  setCouponCode(value)
+                  setCouponError('')
+                  if (appliedCoupon && value.trim() !== (appliedCoupon.coupon?.code ?? '')) {
+                    setAppliedCoupon(null)
+                  }
+                }}
+                placeholder="ENTER STRIPE COUPON OR PROMO CODE"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                style={{ marginBottom: 0, flex: 1 }}
+              />
+              <button
+                type="button"
+                onClick={() => { void resolveGigPricing() }}
+                className="btn-ghost"
+                disabled={couponApplying}
+                style={{ minWidth: 92, padding: '14px 16px', opacity: couponApplying ? 0.6 : 1 }}
+              >
+                {couponApplying ? '...' : 'APPLY'}
+              </button>
+            </div>
+            {appliedCoupon?.coupon && (
+              <p style={{ fontSize: 10, color: '#888880', letterSpacing: '0.08em', marginTop: 8 }}>
+                {`${appliedCoupon.coupon.code}${appliedCoupon.discountDescription ? ` · ${appliedCoupon.discountDescription}` : ''}${appliedCoupon.free ? ' · FREE POST' : ''}`}
+              </p>
+            )}
+            {couponError && <p style={{ fontSize: 10, color: '#c0392b', letterSpacing: '0.08em', marginTop: 8 }}>{couponError}</p>}
+          </div>
+
           {paymentSuccess ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', border: '1px solid #2a7a4f', background: 'rgba(42,122,79,0.06)' }}>
               <p style={{ fontSize: 32, marginBottom: 16 }}>✓</p>
@@ -607,10 +753,10 @@ export default function PostGigPage() {
             <button
               onClick={handleProceedToPayment}
               className="btn-red"
-              disabled={submitting || uploadingImage}
+              disabled={submitting || uploadingImage || couponApplying}
               style={{ padding: '14px', fontSize: 11, letterSpacing: '0.14em' }}
             >
-              {submitting || uploadingImage ? 'PREPARING...' : 'PROCEED TO PAYMENT ›'}
+              {submitting || uploadingImage || couponApplying ? 'PREPARING...' : appliedCoupon?.free ? 'POST GIG FREE' : 'PROCEED TO PAYMENT ›'}
             </button>
           ) : (
             <>
@@ -620,7 +766,7 @@ export default function PostGigPage() {
               <div style={{ border: '1px solid #222', overflow: 'hidden' }}>
                 <iframe
                   ref={iframeRef}
-                  src={`https://workerofart.com/checkout/gig.html?v=${checkoutVersion}&user_id=${currentUserId}&featured=${isFeatured}&gig_id=${pendingGigId}`}
+                  src={`https://workerofart.com/checkout/gig.html?v=${checkoutVersion}&user_id=${currentUserId}&featured=${isFeatured}&gig_id=${pendingGigId}&amount_cents=${appliedCoupon?.amount ?? baseAmountCents}${couponCode.trim() ? `&coupon_code=${encodeURIComponent(couponCode.trim())}` : ''}`}
                   style={{ width: '100%', height: 520, border: 'none', background: '#000' }}
                   title="Payment"
                 />

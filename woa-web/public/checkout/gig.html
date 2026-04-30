@@ -48,6 +48,7 @@
     font-family: var(--font); padding: 16px 12px;
     cursor: pointer; transition: all 0.2s; text-align: center;
   }
+  .tier-btn.locked { opacity: 0.7; cursor: default; }
   .tier-btn.active { border-color: var(--red); background: #0a0000; color: var(--white); }
   .tier-btn.featured.active { border-color: var(--gold); background: #0a0800; }
   .tier-name { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; display: block; margin-bottom: 6px; }
@@ -152,16 +153,32 @@
   const params = new URLSearchParams(window.location.search);
   const userId = params.get('user_id');
   const gigId = params.get('gig_id'); // passed from app after gig draft is saved
+  const couponCode = params.get('coupon_code') || '';
+  const initialFeatured = params.get('featured') === 'true';
+  const tierLocked = params.has('featured') || params.has('amount_cents');
+  const amountOverride = Number(params.get('amount_cents') || '');
   const SUPABASE_FUNCTIONS_URL = 'https://tehkoxslqtgofivlcdyk.supabase.co/functions/v1/create-checkout';
   const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_lwgQsrT4prd3upPoGGu7QA_csHmVUnt';
 
-  let currentTier = 'standard';
+  let currentTier = initialFeatured ? 'featured' : 'standard';
   const PRICES = {
-    standard: { id: 'price_1TJ8RV2XCT18tsxgO0hqT1Tu', amount: '$6' },
-    featured:  { id: 'price_1TJ8TE2XCT18tsxg1vBmxhKw', amount: '$14' },
+    standard: { amountCents: 600 },
+    featured:  { amountCents: 1400 },
   };
 
+  function formatAmount(cents) {
+    return `$${(cents / 100).toFixed(2).replace(/\.00$/, '')}`;
+  }
+
+  function getDisplayAmountCents() {
+    if (Number.isFinite(amountOverride) && amountOverride > 0) {
+      return amountOverride;
+    }
+    return PRICES[currentTier].amountCents;
+  }
+
   function selectTier(tier) {
+    if (tierLocked && tier !== currentTier) return;
     currentTier = tier;
     document.getElementById('btn-standard').classList.toggle('active', tier === 'standard');
     document.getElementById('btn-featured').classList.toggle('active', tier === 'featured');
@@ -171,7 +188,7 @@
     featuredExtras.forEach(el => el.style.display = tier === 'featured' ? 'flex' : 'none');
 
     const btn = document.getElementById('submit-btn');
-    btn.textContent = `PAY ${PRICES[tier].amount} — POST GIG`;
+    btn.textContent = `PAY ${formatAmount(getDisplayAmountCents())} — POST GIG`;
     btn.classList.toggle('featured-active', tier === 'featured');
 
     // Update card focus color
@@ -198,6 +215,11 @@
   cardElement.on('change', (e) => {
     document.getElementById('card-errors').textContent = e.error ? e.error.message : '';
   });
+  selectTier(currentTier);
+  if (tierLocked) {
+    document.getElementById('btn-standard').classList.add('locked');
+    document.getElementById('btn-featured').classList.add('locked');
+  }
 
   document.getElementById('payment-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -213,13 +235,30 @@
           type: 'gig',
           user_id: userId,
           gig_id: gigId,
-          price_id: PRICES[currentTier].id,
           is_featured: currentTier === 'featured',
+          coupon_code: couponCode || undefined,
         }),
       });
 
-      const { clientSecret, error } = await res.json();
+      const { clientSecret, error, free } = await res.json();
       if (error) throw new Error(error);
+
+      if (free) {
+        document.getElementById('payment-section').style.display = 'none';
+        document.getElementById('success-screen').style.display = 'block';
+        const msg = JSON.stringify({
+          type: 'gig_payment_success',
+          user_id: userId,
+          gig_id: gigId,
+          is_featured: currentTier === 'featured',
+        });
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(msg);
+        } else {
+          window.parent.postMessage(msg, '*');
+        }
+        return;
+      }
 
       const result = await stripe.confirmCardPayment(clientSecret, {
         payment_method: { card: cardElement },
@@ -228,7 +267,7 @@
       if (result.error) {
         document.getElementById('card-errors').textContent = result.error.message;
         btn.disabled = false;
-        btn.textContent = `PAY ${PRICES[currentTier].amount} — POST GIG`;
+        btn.textContent = `PAY ${formatAmount(getDisplayAmountCents())} — POST GIG`;
       } else {
         document.getElementById('payment-section').style.display = 'none';
         document.getElementById('success-screen').style.display = 'block';
@@ -247,7 +286,7 @@
     } catch (err) {
       document.getElementById('card-errors').textContent = err.message ?? 'SOMETHING WENT WRONG. PLEASE TRY AGAIN.';
       btn.disabled = false;
-      btn.textContent = `PAY ${PRICES[currentTier].amount} — POST GIG`;
+      btn.textContent = `PAY ${formatAmount(getDisplayAmountCents())} — POST GIG`;
     }
   });
 </script>

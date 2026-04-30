@@ -278,11 +278,6 @@ export default function PostDetailScreen() {
       } as Comment,
     ]);
     setPost((prev) => prev ? { ...prev, comment_count: prev.comment_count + 1 } : prev);
-    try {
-      await supabase.rpc('increment_comment_count', { post_id: post.id });
-    } catch {
-      // Keep the new comment visible even if the aggregate counter RPC fails.
-    }
     if (authorId !== post.user_id) {
       await supabase.from('notifications').insert({
         user_id: post.user_id,
