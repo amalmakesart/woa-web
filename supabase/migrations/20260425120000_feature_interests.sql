@@ -7,16 +7,19 @@ create table if not exists public.feature_interests (
 
 alter table public.feature_interests enable row level security;
 
+drop policy if exists "Users can insert their own interest" on public.feature_interests;
 create policy "Users can insert their own interest"
   on public.feature_interests for insert
   to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can view their own interest" on public.feature_interests;
 create policy "Users can view their own interest"
   on public.feature_interests for select
   to authenticated
   using (auth.uid() = user_id);
 
+drop policy if exists "Admins can view all interests" on public.feature_interests;
 create policy "Admins can view all interests"
   on public.feature_interests for select
   to authenticated
