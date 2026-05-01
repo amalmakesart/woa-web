@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -374,6 +374,7 @@ function PostCard({
 
 export default function FeedPage() {
   const router = useRouter()
+  const supabase = createClient()
   const [tab, setTab] = useState<FeedTab>('foryou')
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
@@ -384,17 +385,20 @@ export default function FeedPage() {
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set())
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set())
   const [showSignUp, setShowSignUp] = useState(false)
+  const hasLoadedOnceRef = useRef(false)
 
   const loadFeed = useCallback(async (activeTab: FeedTab) => {
-    setLoading(true)
+    if (!hasLoadedOnceRef.current) setLoading(true)
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user ?? null
       setCurrentUserId(user?.id ?? null)
       setIsAdmin(isAdminEmail(user?.email))
-      if (user) {
+      if (user && (user.id !== currentUserId || !currentUserRole)) {
         const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
         setCurrentUserRole((me as any)?.role ?? null)
+      } else if (!user) {
+        setCurrentUserRole(null)
       }
 
       let postsQuery = supabase
@@ -469,16 +473,16 @@ export default function FeedPage() {
       console.error('Failed to load feed:', e)
       setPosts([])
     } finally {
+      hasLoadedOnceRef.current = true
       setLoading(false)
     }
-  }, [])
+  }, [currentUserId, currentUserRole, supabase])
 
   useEffect(() => { loadFeed(tab) }, [tab, loadFeed])
 
   useEffect(() => {
-    const supabase = createClient()
     const channel = supabase.channel(`web-feed-${tab}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload: any) => {
         const updated = payload.new as Post
         setPosts(prev => prev.map(post => (
           post.id === updated.id
@@ -489,7 +493,7 @@ export default function FeedPage() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, () => {
         void loadFeed(tab)
       })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload: any) => {
         const deleted = payload.old as { id?: string }
         if (!deleted.id) return
         setPosts(prev => prev.filter(post => post.id !== deleted.id))
@@ -503,7 +507,6 @@ export default function FeedPage() {
 
   async function handleBookmark(postId: string) {
     if (!currentUserId) return
-    const supabase = createClient()
     const isBookmarked = bookmarkedIds.has(postId)
     setBookmarkedIds(prev => {
       const next = new Set(prev)
@@ -519,7 +522,6 @@ export default function FeedPage() {
 
   async function handleLike(postId: string) {
     if (!currentUserId) return
-    const supabase = createClient()
     const isLiked = likedIds.has(postId)
     const postBeforeUpdate = posts.find((post) => post.id === postId)
     setLikedIds(prev => {
@@ -567,14 +569,12 @@ export default function FeedPage() {
     if (currentUserId !== post.user_id && !isAdmin) return
     if (!window.confirm('DELETE THIS POST? THIS CANNOT BE UNDONE.')) return
 
-    const supabase = createClient()
     setPosts((prev) => prev.filter((item) => item.id !== post.id))
     await supabase.from('posts').delete().eq('id', post.id)
   }
 
   async function handlePin(post: Post) {
     if (!isAdmin) return
-    const supabase = createClient()
     const newPinned = !post.is_pinned
     setPosts(prev => prev.map(p => p.id === post.id ? { ...p, is_pinned: newPinned } : p))
     await supabase.from('posts').update({ is_pinned: newPinned }).eq('id', post.id)
@@ -588,7 +588,6 @@ export default function FeedPage() {
 
   async function handleFollow(authorId: string) {
     if (!currentUserId) return
-    const supabase = createClient()
     const isFollowing = followingIds.has(authorId)
     setFollowingIds(prev => {
       const next = new Set(prev)
@@ -614,7 +613,6 @@ export default function FeedPage() {
   async function handleBlock(authorId: string) {
     if (!currentUserId) return
     if (!window.confirm('BLOCK THIS USER? THEY WILL NOT BE ABLE TO SEE YOUR PROFILE.')) return
-    const supabase = createClient()
     await supabase.from('blocks').insert({ blocker_id: currentUserId, blocked_id: authorId })
     setPosts(prev => prev.filter(p => p.user_id !== authorId))
   }

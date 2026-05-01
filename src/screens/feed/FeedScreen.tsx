@@ -21,6 +21,8 @@ import MessageButton from '../../components/MessageButton';
 
 const MONO = Platform.select({ ios: 'Courier New', android: 'monospace' }) as string;
 const GOLD = '#f6c55a';
+const FOCUS_REFRESH_INTERVAL_MS = 30000;
+const REALTIME_REFRESH_DEBOUNCE_MS = 700;
 
 type FeedTab = 'foryou' | 'following' | 'arttype' | 'location';
 
@@ -154,6 +156,8 @@ export default function FeedScreen() {
   const currentUserIdRef = useRef<string | null>(null);
   const activeTabRef = useRef<FeedTab>('foryou');
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRefreshAtRef = useRef(0);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -170,10 +174,12 @@ export default function FeedScreen() {
       supabase.from('follows').select('following_id').eq('follower_id', uid),
       supabase.from('blocks').select('blocked_id').eq('blocker_id', uid),
     ]);
+    const nextBlocked = new Set((blocks.data ?? []).map((b: any) => b.blocked_id as string));
     if (likes.data) setLikedPostIds(new Set(likes.data.map((l: any) => l.post_id as string)));
     if (bookmarks.data) setBookmarkedPostIds(new Set(bookmarks.data.map((b: any) => b.post_id as string)));
     if (following.data) setFollowingUserIds(new Set(following.data.map((f: any) => f.following_id as string)));
-    if (blocks.data) setBlockedUserIds(new Set(blocks.data.map((b: any) => b.blocked_id as string)));
+    setBlockedUserIds(nextBlocked);
+    return nextBlocked;
   }, []);
 
   // ── Query posts by tab ───────────────────────────────────────────────────
@@ -277,7 +283,8 @@ export default function FeedScreen() {
   const refreshFeed = useCallback(async (tab: FeedTab, showTabLoader = false) => {
     if (showTabLoader) setTabLoading(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
     const uid = user?.id ?? null;
     currentUserIdRef.current = uid;
     setCurrentUserId(uid);
@@ -302,7 +309,8 @@ export default function FeedScreen() {
       setUserRole((profile as any)?.role ?? null);
       setUserProfile(nextProfile);
       setIsAdmin(user?.email === 'amalmakesart@gmail.com');
-      await loadSocialState(uid);
+      const blocked = await loadSocialState(uid);
+      setPosts(await fetchPostsForTab(tab, uid, nextProfile, blocked));
     } else {
       setAvatarUri(null);
       setUserRole(null);
@@ -312,18 +320,19 @@ export default function FeedScreen() {
       setBookmarkedPostIds(new Set());
       setFollowingUserIds(new Set());
       setBlockedUserIds(new Set());
+      setPosts(await fetchPostsForTab(tab, null, EMPTY_USER_PROFILE, new Set<string>()));
     }
-
-    const blocked = uid
-      ? await supabase.from('blocks').select('blocked_id').eq('blocker_id', uid)
-          .then((result) => new Set((result.data ?? []).map((row: any) => row.blocked_id as string)))
-      : new Set<string>();
-
-    setBlockedUserIds(blocked);
-    setPosts(await fetchPostsForTab(tab, uid, nextProfile, blocked));
     setLoading(false);
+    lastRefreshAtRef.current = Date.now();
     if (showTabLoader) setTabLoading(false);
   }, [fetchPostsForTab, loadSocialState]);
+
+  const scheduleRefresh = useCallback((tab: FeedTab, delay = REALTIME_REFRESH_DEBOUNCE_MS) => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      void refreshFeed(tab);
+    }, delay);
+  }, [refreshFeed]);
 
   // ── Init on mount ────────────────────────────────────────────────────────
 
@@ -335,12 +344,12 @@ export default function FeedScreen() {
     void refreshFeed(activeTabRef.current);
 
     const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-      void refreshFeed(activeTabRef.current);
+      scheduleRefresh(activeTabRef.current, 150);
     });
 
     const channel = supabase.channel('feed-posts')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
-        void refreshFeed(activeTabRef.current);
+        scheduleRefresh(activeTabRef.current);
       })
       .subscribe();
 
@@ -348,14 +357,17 @@ export default function FeedScreen() {
       authListener.subscription.unsubscribe();
       supabase.removeChannel(channel);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     };
-  }, [refreshFeed]);
+  }, [refreshFeed, scheduleRefresh]);
 
   // ── Reload on focus ──────────────────────────────────────────────────────
 
   useFocusEffect(
     useCallback(() => {
-      void refreshFeed(activeTab);
+      if (Date.now() - lastRefreshAtRef.current > FOCUS_REFRESH_INTERVAL_MS) {
+        void refreshFeed(activeTab);
+      }
     }, [activeTab, refreshFeed])
   );
 

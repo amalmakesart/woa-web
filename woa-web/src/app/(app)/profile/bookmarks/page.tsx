@@ -53,9 +53,9 @@ export default function BookmarksPage() {
         const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p]))
 
         const sorted = postIds
-          .map(id => (postsData as Post[]).find(p => p.id === id))
-          .filter(Boolean)
-          .map(p => ({ ...p!, profiles: profileMap[p!.user_id] ?? null })) as Post[]
+          .map((id: string) => (postsData as Post[]).find((p: Post) => p.id === id))
+          .filter((post: Post | undefined): post is Post => Boolean(post))
+          .map((p: Post) => ({ ...p, profiles: profileMap[p.user_id] ?? null })) as Post[]
         setPosts(sorted)
       }
       setLoading(false)

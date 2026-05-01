@@ -73,6 +73,7 @@ function getMenu(role: string | null) {
 
 export default function ProfilePage() {
   const router = useRouter()
+  const supabase = createClient()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
@@ -85,8 +86,8 @@ export default function ProfilePage() {
   const [shows, setShows] = useState<any[]>([])
 
   const loadData = useCallback(async () => {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user ?? null
     if (!user) { router.push('/login'); return }
 
     const [{ data: prof }, { data: ownedPosts, count }, { count: followCount }, { data: collaboratorRows }, { data: portfolioData }, { data: showsData }] = await Promise.all([
@@ -120,7 +121,7 @@ export default function ProfilePage() {
     setPortfolio((portfolioData as any[]) ?? [])
     setShows((showsData as any[]) ?? [])
     setLoading(false)
-  }, [router])
+  }, [router, supabase])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -140,7 +141,6 @@ export default function ProfilePage() {
   }, [loadData])
 
   async function handleSignOut() {
-    const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/login')
   }

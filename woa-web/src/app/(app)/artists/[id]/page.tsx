@@ -120,6 +120,7 @@ export default function ArtistProfilePage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
+  const supabase = createClient()
 
   const [profile, setProfile] = useState<Profile | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
@@ -142,8 +143,8 @@ export default function ArtistProfilePage() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user ?? null
       setCurrentUserId(user?.id ?? null)
       setIsAdmin(isAdminEmail(user?.email))
       if (user) {
@@ -209,7 +210,7 @@ export default function ArtistProfilePage() {
       setLoading(false)
     }
     load()
-  }, [id])
+  }, [id, supabase])
 
   async function handleFollow() {
     if (!currentUserId) { router.push('/login'); return }

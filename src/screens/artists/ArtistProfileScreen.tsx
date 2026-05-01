@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,7 @@ type ProfileTab = 'POSTS' | 'PORTFOLIO' | 'CALENDAR';
 const MONO = Platform.select({ ios: 'Courier New', android: 'monospace' }) as string;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const THUMB_SIZE = (SCREEN_WIDTH - 2) / 3;
+const PROFILE_REFRESH_INTERVAL_MS = 30000;
 function isPastShow(dateString: string) {
   return new Date(dateString).getTime() < Date.now();
 }
@@ -270,17 +271,13 @@ export default function ArtistProfileScreen() {
   const [shows, setShows] = useState<Show[]>([]);
   const [portfolioSections, setPortfolioSections] = useState<PortfolioSection[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const lastRefreshAtRef = useRef(0);
 
   useFocusEffect(useCallback(() => {
     const init = async () => {
       setLoading(true);
       const { data: sessionData } = await supabase.auth.getSession();
-      let uid = sessionData.session?.user?.id ?? null;
-
-      if (!uid) {
-        const { data: userData } = await supabase.auth.getUser();
-        uid = userData.user?.id ?? null;
-      }
+      const uid = sessionData.session?.user?.id ?? null;
 
       setCurrentUserId(uid);
 
@@ -417,11 +414,14 @@ export default function ArtistProfileScreen() {
       if (reviewData) setReviews(reviewData as any[]);
 
       setLoading(false);
+      lastRefreshAtRef.current = Date.now();
     };
 
-    void init();
+    if (Date.now() - lastRefreshAtRef.current > PROFILE_REFRESH_INTERVAL_MS || !profile) {
+      void init();
+    }
     return () => {};
-  }, [artistId]));
+  }, [artistId, profile]));
 
   const handleFollow = async () => {
     if (!currentUserId || followLoading) return;

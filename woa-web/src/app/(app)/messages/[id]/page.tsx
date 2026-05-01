@@ -111,7 +111,7 @@ export default function ConversationPage() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `conversation_id=eq.${conversationId}`,
-      }, (payload) => {
+      }, (payload: any) => {
         setMessages(prev => {
           if (prev.find(m => m.id === payload.new.id)) return prev
           return [...prev, payload.new as Message]

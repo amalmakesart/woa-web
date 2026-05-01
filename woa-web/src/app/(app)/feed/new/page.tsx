@@ -192,7 +192,7 @@ export default function NewPostPage() {
         const ext = singleFile.name.split('.').pop()
         const path = `${user.id}/${Date.now()}.${ext}`
         mediaUrl = await uploadToFirstWorkingBucket(type, path, singleFile)
-        mediaUrls = [mediaUrl]
+        mediaUrls = mediaUrl ? [mediaUrl] : []
       }
 
       const tagList = selectedTag ? [selectedTag] : []

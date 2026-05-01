@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
+  useRef,
 } from 'react';
 import {
   View,
@@ -36,6 +37,8 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 const MONO = Platform.select({ ios: 'Courier New', android: 'monospace' }) as string;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_WIDTH = (SCREEN_WIDTH - 2) / 3;
+const FOCUS_REFRESH_INTERVAL_MS = 30000;
+const DIRECTORY_REFRESH_DEBOUNCE_MS = 700;
 
 // ─── Fisher-Yates shuffle ─────────────────────────────────────────────────────
 
@@ -247,6 +250,8 @@ export default function ArtistsScreen() {
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null);
   const [currentUserArtTypes, setCurrentUserArtTypes] = useState<string[]>([]);
+  const lastRefreshAtRef = useRef(0);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const availableCountries = useMemo(() =>
     [...new Set(allArtists.map((a) => a.country).filter(Boolean) as string[])].sort(),
@@ -312,16 +317,12 @@ export default function ArtistsScreen() {
 
   const loadCurrentUserProfile = useCallback(async () => {
     const { data: sessionData } = await supabase.auth.getSession();
-    let uid = sessionData.session?.user?.id ?? null;
-
-    if (!uid) {
-      const { data: userData } = await supabase.auth.getUser();
-      uid = userData.user?.id ?? null;
-    }
+    const uid = sessionData.session?.user?.id ?? null;
 
     if (!uid) {
       setCurrentUserRole(null);
       setCurrentUserAvatar(null);
+      setCurrentUserArtTypes([]);
       return;
     }
 
@@ -338,30 +339,41 @@ export default function ArtistsScreen() {
 
   const refreshArtists = useCallback(async () => {
     await Promise.all([loadArtists(), loadCurrentUserProfile()]);
+    lastRefreshAtRef.current = Date.now();
   }, [loadArtists, loadCurrentUserProfile]);
+
+  const scheduleRefresh = useCallback((delay = DIRECTORY_REFRESH_DEBOUNCE_MS) => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      void refreshArtists();
+    }, delay);
+  }, [refreshArtists]);
 
   useEffect(() => {
     void refreshArtists();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-      void refreshArtists();
+      scheduleRefresh(150);
     });
 
     const channel = supabase.channel('artists-directory')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        void refreshArtists();
+        scheduleRefresh();
       })
       .subscribe();
 
     return () => {
       authListener.subscription.unsubscribe();
       supabase.removeChannel(channel);
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     };
-  }, [refreshArtists]);
+  }, [refreshArtists, scheduleRefresh]);
 
   useFocusEffect(
     useCallback(() => {
-      void refreshArtists();
+      if (Date.now() - lastRefreshAtRef.current > FOCUS_REFRESH_INTERVAL_MS) {
+        void refreshArtists();
+      }
     }, [refreshArtists])
   );
 

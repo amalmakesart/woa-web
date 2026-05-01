@@ -25,8 +25,8 @@ export function Sidebar() {
   useEffect(() => {
     let alive = true
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
-      if (alive) setIsAdmin(isAdminEmail(data.user?.email))
+    supabase.auth.getSession().then(({ data }: { data: { session: { user?: { email?: string | null } } | null } }) => {
+      if (alive) setIsAdmin(isAdminEmail(data.session?.user?.email))
     })
     return () => { alive = false }
   }, [])
