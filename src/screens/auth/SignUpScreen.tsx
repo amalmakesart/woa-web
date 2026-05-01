@@ -510,6 +510,12 @@ export default function SignUpScreen({ navigation }: Props) {
     experience,
   ]);
 
+  const buildAuthMetadata = useCallback((signupRole: Role) => ({
+    username: username.toLowerCase(),
+    full_name: fullName.trim() || null,
+    role: signupRole,
+  }), [fullName, username]);
+
   const uploadProfilePhoto = useCallback(async (userId: string) => {
     if (!photoUri) return null;
 
@@ -653,7 +659,7 @@ export default function SignUpScreen({ navigation }: Props) {
         email,
         password,
         options: {
-          data: buildProfilePayload('ARTIST'),
+          data: buildAuthMetadata('ARTIST'),
           emailRedirectTo: EMAIL_REDIRECT_URL,
         },
       });
@@ -801,7 +807,7 @@ export default function SignUpScreen({ navigation }: Props) {
             email,
             password,
             options: {
-              data: buildProfilePayload(role),
+              data: buildAuthMetadata(role),
               emailRedirectTo: EMAIL_REDIRECT_URL,
             },
           });
@@ -940,7 +946,7 @@ export default function SignUpScreen({ navigation }: Props) {
             email,
             password,
             options: {
-              data: buildProfilePayload('COLLECTIVE'),
+              data: buildAuthMetadata('COLLECTIVE'),
               emailRedirectTo: EMAIL_REDIRECT_URL,
             },
           });
