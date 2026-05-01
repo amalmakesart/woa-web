@@ -402,7 +402,11 @@ export default function SignupPage() {
   }
 
   function buildAuthMetadata() {
-    return buildProfileData(null)
+    return {
+      username: username.toLowerCase(),
+      full_name: fullName.trim() || null,
+      role,
+    }
   }
 
   async function uploadAvatar(userId: string) {
@@ -442,6 +446,12 @@ export default function SignupPage() {
         return
       }
 
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        ...profileData,
+        profile_photo_url: avatarFallbackUrl,
+      })
+
       if (avatarFile) {
         void (async () => {
           const avatarUrl = await uploadAvatar(user.id)
@@ -451,12 +461,6 @@ export default function SignupPage() {
             profile_photo_url: avatarUrl,
           }).eq('id', user.id)
         })()
-      } else {
-        void supabase.from('profiles').upsert({
-          id: user.id,
-          ...profileData,
-          profile_photo_url: avatarFallbackUrl,
-        })
       }
 
       router.push('/feed')
