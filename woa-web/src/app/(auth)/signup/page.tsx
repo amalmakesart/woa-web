@@ -72,6 +72,8 @@ const ROLE_OPTIONS: { value: Role; label: string; description: string }[] = [
 ]
 
 const EMAIL_REDIRECT_URL = 'https://www.workerofart.com/auth/confirmed'
+const MAX_AVATAR_FALLBACK_BYTES = 900 * 1024
+const AVATAR_FALLBACK_MAX_EDGE = 320
 
 function normalizeCity(value: string) {
   const normalized = value.trim().toUpperCase()
@@ -79,12 +81,38 @@ function normalizeCity(value: string) {
 }
 
 async function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
-    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'))
-    reader.readAsDataURL(file)
-  })
+  const objectUrl = URL.createObjectURL(file)
+
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => reject(new Error('Failed to load image'))
+      img.src = objectUrl
+    })
+
+    const longestEdge = Math.max(image.naturalWidth, image.naturalHeight) || 1
+    const scale = Math.min(1, AVATAR_FALLBACK_MAX_EDGE / longestEdge)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+
+    const context = canvas.getContext('2d')
+    if (!context) return null
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+    for (const quality of [0.82, 0.72, 0.6, 0.5]) {
+      const dataUrl = canvas.toDataURL('image/jpeg', quality)
+      if (dataUrl.length <= MAX_AVATAR_FALLBACK_BYTES) {
+        return dataUrl
+      }
+    }
+
+    return null
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
 }
 
 function AvatarUpload({ preview, onChange }: { preview: string | null; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
