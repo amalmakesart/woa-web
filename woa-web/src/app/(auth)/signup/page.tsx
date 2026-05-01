@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { WOALogo } from '@/components/WOALogo'
+import { CITIES_BY_COUNTRY, COUNTRIES } from '@/lib/locationData'
 
 type Role = 'ARTIST' | 'GIG_POSTER' | 'COLLECTIVE' | 'ART_LOVER'
 type Step = 1 | 2 | 3 | 4
@@ -74,13 +75,15 @@ const ROLE_OPTIONS: { value: Role; label: string; description: string }[] = [
 const EMAIL_REDIRECT_URL = 'https://www.workerofart.com/auth/confirmed'
 const MAX_AVATAR_FALLBACK_BYTES = 900 * 1024
 const AVATAR_FALLBACK_MAX_EDGE = 320
+const AVATAR_UPLOAD_MAX_EDGE = 1400
+const AVATAR_UPLOAD_QUALITY = 0.86
 
 function normalizeCity(value: string) {
   const normalized = value.trim().toUpperCase()
   return normalized || null
 }
 
-async function readFileAsDataUrl(file: File) {
+async function processAvatarFile(file: File) {
   const objectUrl = URL.createObjectURL(file)
 
   try {
@@ -92,24 +95,62 @@ async function readFileAsDataUrl(file: File) {
     })
 
     const longestEdge = Math.max(image.naturalWidth, image.naturalHeight) || 1
-    const scale = Math.min(1, AVATAR_FALLBACK_MAX_EDGE / longestEdge)
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+    const uploadScale = Math.min(1, AVATAR_UPLOAD_MAX_EDGE / longestEdge)
+    const uploadCanvas = document.createElement('canvas')
+    uploadCanvas.width = Math.max(1, Math.round(image.naturalWidth * uploadScale))
+    uploadCanvas.height = Math.max(1, Math.round(image.naturalHeight * uploadScale))
 
-    const context = canvas.getContext('2d')
-    if (!context) return null
+    const uploadContext = uploadCanvas.getContext('2d')
+    if (!uploadContext) {
+      throw new Error('Failed to process image')
+    }
+    uploadContext.drawImage(image, 0, 0, uploadCanvas.width, uploadCanvas.height)
 
-    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+    const uploadBlob = await new Promise<Blob | null>((resolve) => {
+      uploadCanvas.toBlob(
+        blob => resolve(blob),
+        'image/jpeg',
+        AVATAR_UPLOAD_QUALITY
+      )
+    })
+    if (!uploadBlob) {
+      throw new Error('Failed to prepare image upload')
+    }
+
+    const uploadFile = new File(
+      [uploadBlob],
+      `${file.name.replace(/\.[^.]+$/, '') || 'avatar'}.jpg`,
+      { type: 'image/jpeg' }
+    )
+
+    const fallbackScale = Math.min(1, AVATAR_FALLBACK_MAX_EDGE / longestEdge)
+    const fallbackCanvas = document.createElement('canvas')
+    fallbackCanvas.width = Math.max(1, Math.round(image.naturalWidth * fallbackScale))
+    fallbackCanvas.height = Math.max(1, Math.round(image.naturalHeight * fallbackScale))
+
+    const fallbackContext = fallbackCanvas.getContext('2d')
+    if (!fallbackContext) {
+      throw new Error('Failed to prepare image preview')
+    }
+
+    fallbackContext.drawImage(image, 0, 0, fallbackCanvas.width, fallbackCanvas.height)
 
     for (const quality of [0.82, 0.72, 0.6, 0.5]) {
-      const dataUrl = canvas.toDataURL('image/jpeg', quality)
+      const dataUrl = fallbackCanvas.toDataURL('image/jpeg', quality)
       if (dataUrl.length <= MAX_AVATAR_FALLBACK_BYTES) {
-        return dataUrl
+        return {
+          uploadFile,
+          previewUrl: URL.createObjectURL(uploadBlob),
+          fallbackDataUrl: dataUrl,
+        }
       }
     }
 
-    return null
+    return {
+      uploadFile,
+      previewUrl: URL.createObjectURL(uploadBlob),
+      fallbackDataUrl: null,
+    }
   } finally {
     URL.revokeObjectURL(objectUrl)
   }
@@ -212,6 +253,7 @@ export default function SignupPage() {
   const router = useRouter()
   const [step, setStep] = useState<Step>(1)
   const [role, setRole] = useState<Role>('ARTIST')
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null)
 
   // Step 2: credentials
   const [username, setUsername] = useState('')
@@ -223,6 +265,9 @@ export default function SignupPage() {
   // Profile photo
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarFallbackUrl, setAvatarFallbackUrl] = useState<string | null>(null)
+  const [avatarProcessing, setAvatarProcessing] = useState(false)
+  const [avatarError, setAvatarError] = useState('')
 
   // Common
   const [fullName, setFullName] = useState('')
@@ -250,6 +295,7 @@ export default function SignupPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const availableCities = useMemo(() => country ? (CITIES_BY_COUNTRY[country] ?? []) : [], [country])
 
   useEffect(() => {
     if (!username.trim()) { setUsernameStatus('idle'); return }
@@ -266,11 +312,41 @@ export default function SignupPage() {
     }, 500)
   }, [username])
 
-  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      if (avatarPreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(avatarPreview)
+      }
+    }
+  }, [avatarPreview])
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setAvatarFile(file)
-    setAvatarPreview(URL.createObjectURL(file))
+    setAvatarError('')
+    setAvatarProcessing(true)
+
+    try {
+      const processed = await processAvatarFile(file)
+      setAvatarFile(processed.uploadFile)
+      setAvatarFallbackUrl(processed.fallbackDataUrl)
+      setAvatarPreview(current => {
+        if (current?.startsWith('blob:')) URL.revokeObjectURL(current)
+        return processed.previewUrl
+      })
+    } catch {
+      setAvatarFile(null)
+      setAvatarFallbackUrl(null)
+      setAvatarPreview(current => {
+        if (current?.startsWith('blob:')) URL.revokeObjectURL(current)
+        return null
+      })
+      setAvatarError('PLEASE CHOOSE A JPG, PNG, OR WEBP PHOTO.')
+    } finally {
+      e.target.value = ''
+      setAvatarProcessing(false)
+    }
   }
 
   function toggleArtType(type: string, max: number, current: string[], setter: (fn: (prev: string[]) => string[]) => void) {
@@ -328,12 +404,10 @@ export default function SignupPage() {
   async function uploadAvatar(userId: string) {
     if (!avatarFile) return null
     const supabase = createClient()
-    const ext = avatarFile.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-    const contentType = avatarFile.type || (ext === 'png' ? 'image/png' : 'image/jpeg')
-    const path = `${userId}/avatar.${ext}`
+    const path = `${userId}/avatar.jpg`
     const { error: upErr } = await supabase.storage.from('avatars').upload(path, avatarFile, {
       upsert: true,
-      contentType,
+      contentType: 'image/jpeg',
     })
     if (upErr) return null
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
@@ -345,12 +419,12 @@ export default function SignupPage() {
     setLoading(true)
     const supabase = createClient()
     try {
-      const avatarFallbackUrl = avatarFile ? await readFileAsDataUrl(avatarFile) : null
+      const profileData = buildProfileData(avatarFallbackUrl)
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: buildProfileData(avatarFallbackUrl),
+          data: profileData,
           emailRedirectTo: EMAIL_REDIRECT_URL,
         },
       })
@@ -358,14 +432,27 @@ export default function SignupPage() {
       const user = signUpData.user
       if (!user) { setError('SIGN UP FAILED — TRY AGAIN.'); return }
 
-      const avatarUrl = await uploadAvatar(user.id)
-      const profilePhotoUrl = avatarUrl ?? avatarFallbackUrl
+      if (!signUpData.session) {
+        setConfirmationEmail(email.trim())
+        return
+      }
 
-      await supabase.from('profiles').upsert({
-        id: user.id,
-        ...buildProfileData(profilePhotoUrl),
-        profile_photo_url: profilePhotoUrl,
-      })
+      if (avatarFile) {
+        void (async () => {
+          const avatarUrl = await uploadAvatar(user.id)
+          if (!avatarUrl) return
+
+          await supabase.from('profiles').update({
+            profile_photo_url: avatarUrl,
+          }).eq('id', user.id)
+        })()
+      } else {
+        void supabase.from('profiles').upsert({
+          id: user.id,
+          ...profileData,
+          profile_photo_url: avatarFallbackUrl,
+        })
+      }
 
       router.push('/feed')
       router.refresh()
@@ -377,6 +464,69 @@ export default function SignupPage() {
   }
 
   const borderDim = 'rgba(255,255,255,0.15)'
+
+  if (confirmationEmail) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', background: '#000' }}>
+        <div style={{ width: '100%', maxWidth: 440, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(10,10,10,0.92)', padding: '36px 28px', textAlign: 'center', boxShadow: '0 24px 80px rgba(0,0,0,0.45)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
+            <WOALogo size="lg" />
+          </div>
+
+          <div style={{ display: 'inline-block', padding: '6px 10px', border: '1px solid rgba(246,197,90,0.5)', color: '#f6c55a', fontSize: 10, letterSpacing: '0.18em', marginBottom: 18 }}>
+            CHECK YOUR EMAIL
+          </div>
+
+          <h1 style={{ fontSize: 18, lineHeight: 1.4, letterSpacing: '0.08em', marginBottom: 14 }}>
+            CONFIRM YOUR ACCOUNT
+          </h1>
+
+          <p style={{ fontSize: 11, lineHeight: 1.9, letterSpacing: '0.08em', color: '#b5b5b5', marginBottom: 16 }}>
+            WE SENT A CONFIRMATION LINK TO <span style={{ color: '#fff' }}>{confirmationEmail.toUpperCase()}</span>.
+          </p>
+
+          <p style={{ fontSize: 11, lineHeight: 1.9, letterSpacing: '0.08em', color: '#b5b5b5', marginBottom: 24 }}>
+            OPEN THAT EMAIL, TAP THE LINK, AND YOU'LL LAND BACK ON WORK(ER) OF ART READY TO LOG IN.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Link
+              href="/login"
+              style={{
+                display: 'block',
+                textDecoration: 'none',
+                background: '#c0392b',
+                color: '#fff',
+                padding: '14px 18px',
+                fontSize: 10,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+              }}
+            >
+              GO TO LOGIN
+            </Link>
+            <button
+              type="button"
+              onClick={() => setConfirmationEmail(null)}
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.16)',
+                color: '#fff',
+                padding: '14px 18px',
+                fontSize: 10,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              BACK TO SIGNUP
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // ── Step 1: Role ────────────────────────────────────────────────────────────
   if (step === 1) {
@@ -553,7 +703,7 @@ export default function SignupPage() {
 
     // ── GIG POSTER ──────────────────────────────────────────────────────────
     if (role === 'GIG_POSTER') {
-      const canLaunch = Boolean(fullName.trim() && !loading)
+      const canLaunch = Boolean(fullName.trim() && !loading && !avatarProcessing)
       return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', background: '#000' }}>
           <div style={{ width: '100%', maxWidth: 420 }}>
@@ -563,6 +713,8 @@ export default function SignupPage() {
             <p style={{ fontSize: 10, color: '#555', letterSpacing: '0.2em', marginBottom: 24 }}>CREDENTIALS › PROFILE</p>
 
             <AvatarUpload preview={avatarPreview} onChange={handleAvatarChange} />
+            {avatarError && <p style={{ fontSize: 11, color: '#c0392b', letterSpacing: '0.06em', marginTop: -10, marginBottom: 12 }}>{avatarError}</p>}
+            {avatarProcessing && <p style={{ fontSize: 10, color: '#888', letterSpacing: '0.12em', textAlign: 'center', marginTop: -10, marginBottom: 12 }}>OPTIMIZING PHOTO...</p>}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
@@ -573,7 +725,7 @@ export default function SignupPage() {
               {error && <p style={{ fontSize: 11, color: '#c0392b', letterSpacing: '0.06em' }}>{error}</p>}
 
               <button className="btn-red" onClick={handleSubmit} disabled={!canLaunch} style={{ padding: '14px', opacity: canLaunch ? 1 : 0.35 }}>
-                {loading ? 'CREATING PROFILE...' : 'LAUNCH MY PROFILE'}
+                {avatarProcessing ? 'PREPARING PHOTO...' : loading ? 'CREATING PROFILE...' : 'LAUNCH MY PROFILE'}
               </button>
             </div>
           </div>
@@ -583,7 +735,7 @@ export default function SignupPage() {
 
     // ── ART LOVER ──────────────────────────────────────────────────────────
     if (role === 'ART_LOVER') {
-      const canLaunch = Boolean(fullName.trim() && !loading)
+      const canLaunch = Boolean(fullName.trim() && !loading && !avatarProcessing)
       return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px 80px', background: '#000' }}>
           <div style={{ width: '100%', maxWidth: 420 }}>
@@ -593,6 +745,8 @@ export default function SignupPage() {
             <p style={{ fontSize: 10, color: '#555', letterSpacing: '0.2em', marginBottom: 24 }}>CREDENTIALS › PROFILE</p>
 
             <AvatarUpload preview={avatarPreview} onChange={handleAvatarChange} />
+            {avatarError && <p style={{ fontSize: 11, color: '#c0392b', letterSpacing: '0.06em', marginTop: -10, marginBottom: 12 }}>{avatarError}</p>}
+            {avatarProcessing && <p style={{ fontSize: 10, color: '#888', letterSpacing: '0.12em', textAlign: 'center', marginTop: -10, marginBottom: 12 }}>OPTIMIZING PHOTO...</p>}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
@@ -617,7 +771,7 @@ export default function SignupPage() {
               {error && <p style={{ fontSize: 11, color: '#c0392b', letterSpacing: '0.06em' }}>{error}</p>}
 
               <button className="btn-red" onClick={handleSubmit} disabled={!canLaunch} style={{ padding: '14px', opacity: canLaunch ? 1 : 0.35 }}>
-                {loading ? 'CREATING PROFILE...' : 'ENTER WORK(ER) OF ART'}
+                {avatarProcessing ? 'PREPARING PHOTO...' : loading ? 'CREATING PROFILE...' : 'ENTER WORK(ER) OF ART'}
               </button>
             </div>
           </div>
@@ -627,7 +781,7 @@ export default function SignupPage() {
 
     // ── COLLECTIVE ──────────────────────────────────────────────────────────
     if (role === 'COLLECTIVE') {
-      const canLaunch = Boolean(fullName.trim() && collectiveType && country.trim() && city.trim() && !loading)
+      const canLaunch = Boolean(fullName.trim() && collectiveType && country.trim() && city.trim() && !loading && !avatarProcessing)
       return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px 80px', background: '#000' }}>
           <div style={{ width: '100%', maxWidth: 420 }}>
@@ -637,6 +791,8 @@ export default function SignupPage() {
             <p style={{ fontSize: 10, color: '#555', letterSpacing: '0.2em', marginBottom: 24 }}>CREDENTIALS › ORG PROFILE</p>
 
             <AvatarUpload preview={avatarPreview} onChange={handleAvatarChange} />
+            {avatarError && <p style={{ fontSize: 11, color: '#c0392b', letterSpacing: '0.06em', marginTop: -10, marginBottom: 12 }}>{avatarError}</p>}
+            {avatarProcessing && <p style={{ fontSize: 10, color: '#888', letterSpacing: '0.12em', textAlign: 'center', marginTop: -10, marginBottom: 12 }}>OPTIMIZING PHOTO...</p>}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
@@ -666,11 +822,30 @@ export default function SignupPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label className="woa-input-label">COUNTRY *</label>
-                  <input className="woa-input" type="text" value={country} onChange={e => setCountry(e.target.value)} placeholder="COUNTRY" required />
+                  <select
+                    className="woa-input"
+                    value={country}
+                    onChange={e => { setCountry(e.target.value); setCity('') }}
+                    style={{ cursor: 'pointer' }}
+                    required
+                  >
+                    <option value="">SELECT COUNTRY</option>
+                    {COUNTRIES.map(item => <option key={item} value={item} style={{ background: '#111' }}>{item}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="woa-input-label">CITY *</label>
-                  <input className="woa-input" type="text" value={city} onChange={e => setCity(e.target.value)} placeholder="CITY" required />
+                  <select
+                    className="woa-input"
+                    value={city}
+                    onChange={e => setCity(e.target.value)}
+                    style={{ cursor: country ? 'pointer' : 'not-allowed', opacity: country ? 1 : 0.5 }}
+                    disabled={!country}
+                    required
+                  >
+                    <option value="">{country ? 'SELECT CITY' : 'SELECT COUNTRY FIRST'}</option>
+                    {availableCities.map(item => <option key={item} value={item} style={{ background: '#111' }}>{item}</option>)}
+                  </select>
                 </div>
               </div>
               <div>
@@ -696,7 +871,7 @@ export default function SignupPage() {
               {error && <p style={{ fontSize: 11, color: '#c0392b', letterSpacing: '0.06em' }}>{error}</p>}
 
               <button className="btn-red" onClick={handleSubmit} disabled={!canLaunch} style={{ padding: '14px', opacity: canLaunch ? 1 : 0.35 }}>
-                {loading ? 'CREATING PROFILE...' : 'LAUNCH OUR PROFILE'}
+                {avatarProcessing ? 'PREPARING PHOTO...' : loading ? 'CREATING PROFILE...' : 'LAUNCH OUR PROFILE'}
               </button>
             </div>
           </div>
@@ -706,6 +881,8 @@ export default function SignupPage() {
 
     // ── ARTIST: Profile step ──────────────────────────────────────────────
     function handleArtistContinue() {
+      if (avatarProcessing) { setError('PLEASE WAIT FOR YOUR PHOTO TO FINISH PROCESSING.'); return }
+      if (avatarError) { setError(avatarError); return }
       if (!avatarPreview) { setError('PLEASE UPLOAD A PROFILE PHOTO.'); return }
       if (!fullName.trim()) { setError('FULL NAME IS REQUIRED.'); return }
       if (!discipline) { setError('PLEASE SELECT YOUR DISCIPLINE.'); return }
@@ -726,6 +903,8 @@ export default function SignupPage() {
           <StepBreadcrumb active={2} />
 
           <AvatarUpload preview={avatarPreview} onChange={handleAvatarChange} />
+          {avatarError && <p style={{ fontSize: 11, color: '#c0392b', letterSpacing: '0.06em', textAlign: 'center', marginTop: -10, marginBottom: 12 }}>{avatarError}</p>}
+          {avatarProcessing && <p style={{ fontSize: 10, color: '#888', letterSpacing: '0.12em', textAlign: 'center', marginTop: -10, marginBottom: 12 }}>OPTIMIZING PHOTO...</p>}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
@@ -768,11 +947,30 @@ export default function SignupPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label className="woa-input-label">COUNTRY *</label>
-                <input className="woa-input" type="text" value={country} onChange={e => setCountry(e.target.value)} placeholder="COUNTRY" required />
+                <select
+                  className="woa-input"
+                  value={country}
+                  onChange={e => { setCountry(e.target.value); setCity('') }}
+                  style={{ cursor: 'pointer' }}
+                  required
+                >
+                  <option value="">SELECT COUNTRY</option>
+                  {COUNTRIES.map(item => <option key={item} value={item} style={{ background: '#111' }}>{item}</option>)}
+                </select>
               </div>
               <div>
                 <label className="woa-input-label">CITY *</label>
-                <input className="woa-input" type="text" value={city} onChange={e => setCity(e.target.value)} placeholder="CITY" required />
+                <select
+                  className="woa-input"
+                  value={city}
+                  onChange={e => setCity(e.target.value)}
+                  style={{ cursor: country ? 'pointer' : 'not-allowed', opacity: country ? 1 : 0.5 }}
+                  disabled={!country}
+                  required
+                >
+                  <option value="">{country ? 'SELECT CITY' : 'SELECT COUNTRY FIRST'}</option>
+                  {availableCities.map(item => <option key={item} value={item} style={{ background: '#111' }}>{item}</option>)}
+                </select>
               </div>
             </div>
 
@@ -835,7 +1033,7 @@ export default function SignupPage() {
   }
 
   // ── Step 4: ARTIST links + bio ───────────────────────────────────────────────
-  const canLaunch = Boolean(bio.trim() && !loading)
+  const canLaunch = Boolean(bio.trim() && !loading && !avatarProcessing)
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px 80px', background: '#000' }}>
@@ -879,8 +1077,8 @@ export default function SignupPage() {
           {error && <p style={{ fontSize: 11, color: '#c0392b', letterSpacing: '0.06em' }}>{error}</p>}
 
           <button className="btn-red" onClick={handleSubmit} disabled={!canLaunch} style={{ padding: '14px', opacity: canLaunch ? 1 : 0.35 }}>
-            {loading ? 'CREATING PROFILE...' : 'LAUNCH MY PROFILE'}
-          </button>
+              {avatarProcessing ? 'PREPARING PHOTO...' : loading ? 'CREATING PROFILE...' : 'LAUNCH MY PROFILE'}
+            </button>
         </div>
       </div>
     </div>

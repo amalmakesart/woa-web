@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { CITIES_BY_COUNTRY, COUNTRIES } from '@/lib/locationData'
 
 const DISCIPLINES = [
   'PHOTOGRAPHER', 'VIDEOGRAPHER', 'FILMMAKER', 'MUSICIAN', 'SINGER', 'DJ', 'PRODUCER',
@@ -23,6 +24,7 @@ export default function NewProjectPage() {
   const [isRemote, setIsRemote] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const availableCities = useMemo(() => country ? (CITIES_BY_COUNTRY[country] ?? []) : [], [country])
 
   useEffect(() => {
     async function load() {
@@ -156,18 +158,25 @@ export default function NewProjectPage() {
           </label>
           {!isRemote && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
-              <input
+              <select
                 className="woa-input"
-                placeholder="CITY"
+                value={country}
+                onChange={e => { setCountry(e.target.value); setCity('') }}
+                style={{ cursor: 'pointer' }}
+              >
+                <option value="">SELECT COUNTRY</option>
+                {COUNTRIES.map(item => <option key={item} value={item} style={{ background: '#111' }}>{item}</option>)}
+              </select>
+              <select
+                className="woa-input"
                 value={city}
                 onChange={e => setCity(e.target.value)}
-              />
-              <input
-                className="woa-input"
-                placeholder="COUNTRY"
-                value={country}
-                onChange={e => setCountry(e.target.value)}
-              />
+                style={{ cursor: country ? 'pointer' : 'not-allowed', opacity: country ? 1 : 0.5 }}
+                disabled={!country}
+              >
+                <option value="">{country ? 'SELECT CITY' : 'SELECT COUNTRY FIRST'}</option>
+                {availableCities.map(item => <option key={item} value={item} style={{ background: '#111' }}>{item}</option>)}
+              </select>
             </div>
           )}
         </div>

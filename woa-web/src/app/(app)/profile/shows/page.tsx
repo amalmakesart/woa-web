@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { CITIES_BY_COUNTRY, COUNTRIES } from '@/lib/locationData'
 
 interface Show {
   id: string
@@ -25,11 +26,13 @@ export default function ManageShowsPage() {
   // New show form
   const [title, setTitle] = useState('')
   const [venue, setVenue] = useState('')
+  const [country, setCountry] = useState('')
   const [city, setCity] = useState('')
   const [showDate, setShowDate] = useState('')
   const [showTime, setShowTime] = useState('')
   const [ticketUrl, setTicketUrl] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const availableCities = useMemo(() => country ? (CITIES_BY_COUNTRY[country] ?? []) : [], [country])
 
   useEffect(() => {
     async function load() {
@@ -58,14 +61,14 @@ export default function ManageShowsPage() {
       artist_id: userId,
       title: title.trim(),
       venue: venue.trim() || null,
-      city: city.trim() || null,
+      city: country && city ? `${city}, ${country}` : null,
       show_date: showDate,
       show_time: showTime || null,
       ticket_url: ticketUrl.trim() || null,
     }).select('id, title, venue, city, show_date, ticket_url').single()
     if (err) { setError(err.message); setSaving(false); return }
     setShows(prev => [data as Show, ...prev])
-    setTitle(''); setVenue(''); setCity(''); setShowDate(''); setShowTime(''); setTicketUrl('')
+    setTitle(''); setVenue(''); setCountry(''); setCity(''); setShowDate(''); setShowTime(''); setTicketUrl('')
     setShowForm(false)
     setSaving(false)
   }
@@ -112,9 +115,30 @@ export default function ManageShowsPage() {
               <input className="woa-input" value={venue} onChange={e => setVenue(e.target.value)} placeholder="VENUE NAME" />
             </div>
             <div>
-              <label className="woa-input-label">CITY (OPTIONAL)</label>
-              <input className="woa-input" value={city} onChange={e => setCity(e.target.value)} placeholder="CITY" />
+              <label className="woa-input-label">COUNTRY (OPTIONAL)</label>
+              <select
+                className="woa-input"
+                value={country}
+                onChange={e => { setCountry(e.target.value); setCity('') }}
+                style={{ cursor: 'pointer' }}
+              >
+                <option value="">SELECT COUNTRY</option>
+                {COUNTRIES.map(item => <option key={item} value={item} style={{ background: '#111' }}>{item}</option>)}
+              </select>
             </div>
+          </div>
+          <div>
+            <label className="woa-input-label">CITY (OPTIONAL)</label>
+            <select
+              className="woa-input"
+              value={city}
+              onChange={e => setCity(e.target.value)}
+              style={{ cursor: country ? 'pointer' : 'not-allowed', opacity: country ? 1 : 0.5 }}
+              disabled={!country}
+            >
+              <option value="">{country ? 'SELECT CITY' : 'SELECT COUNTRY FIRST'}</option>
+              {availableCities.map(item => <option key={item} value={item} style={{ background: '#111' }}>{item}</option>)}
+            </select>
           </div>
           <div>
             <label className="woa-input-label">TICKET URL (OPTIONAL)</label>

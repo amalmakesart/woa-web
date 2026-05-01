@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { isAdminEmail } from '@/lib/admin'
+import { CITIES_BY_COUNTRY, COUNTRIES } from '@/lib/locationData'
 
 const DISCIPLINES = [
   'Photographer', 'Musician', 'Videographer', 'Model', 'Dancer', 'Filmmaker',
@@ -72,6 +73,7 @@ export default function EditProfilePage() {
   const [memberCount, setMemberCount] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [uploading, setUploading] = useState(false)
+  const availableCities = useMemo(() => country ? (CITIES_BY_COUNTRY[country] ?? []) : [], [country])
 
   const normalizedRole = (role ?? '').toUpperCase()
   const isGigPoster = normalizedRole === 'GIG_POSTER'
@@ -95,12 +97,16 @@ export default function EditProfilePage() {
       const { data } = await supabase.from('profiles').select('*').eq('id', profileId).single()
       if (data) {
         const d = data as any
+        const nextCountry = COUNTRIES.includes(d.country ?? '') ? d.country : ''
+        const nextCity = nextCountry && (CITIES_BY_COUNTRY[nextCountry] ?? []).includes(d.city ?? '')
+          ? d.city
+          : ''
         setFullName(d.full_name ?? '')
         setUsername(d.username ?? '')
         setDiscipline(d.discipline ?? d.art_type ?? '')
         setArtTypes(d.art_types ?? [])
-        setCity(d.city ?? '')
-        setCountry(d.country ?? '')
+        setCity(nextCity)
+        setCountry(nextCountry)
         setBio(d.bio ?? '')
         setExperience(d.experience ?? '')
         setInstagram(d.instagram ?? '')
@@ -360,12 +366,29 @@ export default function EditProfilePage() {
             <p style={{ fontSize: 9, letterSpacing: '0.2em', color: '#555', marginBottom: 14 }}>LOCATION</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label className="woa-input-label">CITY</label>
-                <input className="woa-input" value={city} onChange={e => setCity(e.target.value)} placeholder="City" />
+                <label className="woa-input-label">COUNTRY</label>
+                <select
+                  className="woa-input"
+                  value={country}
+                  onChange={e => { setCountry(e.target.value); setCity('') }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <option value="">SELECT COUNTRY</option>
+                  {COUNTRIES.map(item => <option key={item} value={item} style={{ background: '#111' }}>{item}</option>)}
+                </select>
               </div>
               <div>
-                <label className="woa-input-label">COUNTRY</label>
-                <input className="woa-input" value={country} onChange={e => setCountry(e.target.value)} placeholder="Country" />
+                <label className="woa-input-label">CITY</label>
+                <select
+                  className="woa-input"
+                  value={city}
+                  onChange={e => setCity(e.target.value)}
+                  style={{ cursor: country ? 'pointer' : 'not-allowed', opacity: country ? 1 : 0.5 }}
+                  disabled={!country}
+                >
+                  <option value="">{country ? 'SELECT CITY' : 'SELECT COUNTRY FIRST'}</option>
+                  {availableCities.map(item => <option key={item} value={item} style={{ background: '#111' }}>{item}</option>)}
+                </select>
               </div>
             </div>
           </div>

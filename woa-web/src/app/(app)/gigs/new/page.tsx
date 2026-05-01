@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { isAdminEmail } from '@/lib/admin'
+import { CITIES_BY_COUNTRY, COUNTRIES as LOCATION_COUNTRIES } from '@/lib/locationData'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -17,27 +18,7 @@ const GIG_ART_TYPES = [
 const STANDARD_PRICE = 6.00
 const FEATURED_PRICE = 14.00
 
-// Inline a small subset — enough for the dropdown.
-// Full list imported from the shared constants at build would be ideal but we keep this self-contained.
-const COUNTRIES = [
-  'Remote',
-  'Afghanistan','Albania','Algeria','Angola','Argentina','Armenia','Australia','Austria','Azerbaijan',
-  'Bahamas','Bahrain','Bangladesh','Barbados','Belarus','Belgium','Belize','Benin','Bhutan','Bolivia',
-  'Bosnia and Herzegovina','Botswana','Brazil','Brunei','Bulgaria','Burkina Faso','Burundi','Cambodia',
-  'Cameroon','Canada','Chile','China','Colombia','Congo','Costa Rica','Croatia','Cuba','Cyprus',
-  'Czech Republic','Denmark','Dominican Republic','Ecuador','Egypt','El Salvador','Estonia','Ethiopia',
-  'Finland','France','Georgia','Germany','Ghana','Greece','Guatemala','Haiti','Honduras','Hungary',
-  'India','Indonesia','Iran','Iraq','Ireland','Israel','Italy','Jamaica','Japan','Jordan','Kazakhstan',
-  'Kenya','Kuwait','Kyrgyzstan','Latvia','Lebanon','Libya','Lithuania','Luxembourg','Malaysia','Mali',
-  'Malta','Mexico','Moldova','Mongolia','Morocco','Mozambique','Myanmar','Namibia','Nepal',
-  'Netherlands','New Zealand','Nicaragua','Nigeria','Norway','Oman','Pakistan','Palestine','Panama',
-  'Paraguay','Peru','Philippines','Poland','Portugal','Puerto Rico','Qatar','Romania','Russia',
-  'Rwanda','Saudi Arabia','Senegal','Serbia','Singapore','Slovakia','Slovenia','Somalia',
-  'South Africa','South Korea','Spain','Sri Lanka','Sudan','Sweden','Switzerland','Syria',
-  'Taiwan','Tajikistan','Tanzania','Thailand','Tunisia','Turkey','Uganda','Ukraine',
-  'United Arab Emirates','United Kingdom','United States','Uruguay','Uzbekistan',
-  'Venezuela','Vietnam','Yemen','Zambia','Zimbabwe',
-]
+const COUNTRIES = ['Remote', ...LOCATION_COUNTRIES]
 
 type Step = 'details' | 'review' | 'payment'
 type GigPricingPreview = {
@@ -104,6 +85,10 @@ export default function PostGigPage() {
   const [couponApplying, setCouponApplying] = useState(false)
   const [couponError, setCouponError] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState<GigPricingPreview | null>(null)
+  const availableCities = useMemo(
+    () => selectedCountry && selectedCountry !== 'Remote' ? (CITIES_BY_COUNTRY[selectedCountry] ?? []) : [],
+    [selectedCountry]
+  )
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -147,10 +132,15 @@ export default function PostGigPage() {
             setSelectedCity('')
           } else if (g.location?.includes(',')) {
             const [cityPart, ...countryParts] = String(g.location).split(',')
-            setSelectedCity(cityPart.trim())
-            setSelectedCountry(countryParts.join(',').trim())
+            const nextCountry = countryParts.join(',').trim()
+            setSelectedCountry(COUNTRIES.includes(nextCountry) ? nextCountry : '')
+            setSelectedCity(
+              COUNTRIES.includes(nextCountry) && (CITIES_BY_COUNTRY[nextCountry] ?? []).includes(cityPart.trim())
+                ? cityPart.trim()
+                : ''
+            )
           } else {
-            setSelectedCountry(g.location ?? '')
+            setSelectedCountry(COUNTRIES.includes(g.location ?? '') ? (g.location ?? '') : '')
           }
           setBudgetMin(g.budget_min != null ? String(g.budget_min) : '')
           setBudgetMax(g.budget_max != null ? String(g.budget_max) : '')
@@ -219,6 +209,7 @@ export default function PostGigPage() {
       if (end < start) { setError('END DATE MUST BE AFTER START DATE'); return false }
     }
     if (!selectedCountry) { setError('LOCATION IS REQUIRED'); return false }
+    if (selectedCountry !== 'Remote' && !selectedCity) { setError('CITY IS REQUIRED'); return false }
     if (!budgetMin && !budgetMax) { setError('BUDGET RANGE IS REQUIRED'); return false }
     return true
   }
@@ -512,7 +503,16 @@ export default function PostGigPage() {
             </div>
             <div>
               <label className="woa-input-label">CITY</label>
-              <input className="woa-input" value={selectedCity} onChange={e => setSelectedCity(e.target.value)} placeholder="Enter city" disabled={!selectedCountry || selectedCountry === 'Remote'} />
+              <select
+                className="woa-input"
+                value={selectedCity}
+                onChange={e => setSelectedCity(e.target.value)}
+                style={{ cursor: selectedCountry && selectedCountry !== 'Remote' ? 'pointer' : 'not-allowed', opacity: selectedCountry && selectedCountry !== 'Remote' ? 1 : 0.5 }}
+                disabled={!selectedCountry || selectedCountry === 'Remote'}
+              >
+                <option value="">{selectedCountry && selectedCountry !== 'Remote' ? 'SELECT CITY' : 'SELECT COUNTRY FIRST'}</option>
+                {availableCities.map(item => <option key={item} value={item} style={{ background: '#111' }}>{item}</option>)}
+              </select>
             </div>
           </div>
 
