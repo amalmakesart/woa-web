@@ -15,6 +15,7 @@ export default function SettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteInput, setDeleteInput] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   // Verified purchase
   const [profile, setProfile] = useState<any>(null)
@@ -73,14 +74,23 @@ export default function SettingsPage() {
   }
 
   async function handleDeleteAccount() {
-    if (deleteInput.toUpperCase() !== 'DELETE') return
+    if (deleteInput.toUpperCase() !== 'DELETE' || deleting) return
     setDeleting(true)
+    setDeleteError('')
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('profiles').update({ full_name: '[DELETED]', username: null, bio: null, profile_photo_url: null }).eq('id', user.id)
+    const { error } = await supabase.functions.invoke('delete-account', {
+      body: {},
+    })
+
+    if (error) {
+      setDeleteError(error.message.toUpperCase())
+      setDeleting(false)
+      return
+    }
+
     await supabase.auth.signOut()
-    router.push('/login')
+    router.replace('/login')
+    router.refresh()
   }
 
   const showVerified = profile && profile.role !== 'GIG_POSTER' && profile.role !== 'ART_LOVER'
@@ -238,6 +248,7 @@ export default function SettingsPage() {
               </p>
               <p style={{ fontSize: 11, color: '#888880', letterSpacing: '0.06em', marginBottom: 10 }}>TYPE "DELETE" TO CONFIRM:</p>
               <input className="woa-input" value={deleteInput} onChange={e => setDeleteInput(e.target.value)} placeholder="DELETE" style={{ marginBottom: 12 }} />
+              {deleteError && <p style={{ fontSize: 11, color: '#c0392b', letterSpacing: '0.06em', marginBottom: 12 }}>{deleteError}</p>}
               <button onClick={handleDeleteAccount} disabled={deleteInput.toUpperCase() !== 'DELETE' || deleting}
                 style={{ width: '100%', padding: '12px', background: deleteInput.toUpperCase() === 'DELETE' ? '#c0392b' : '#1a0a0a', border: '1px solid #c0392b', color: deleteInput.toUpperCase() === 'DELETE' ? '#fff' : '#555', fontSize: 11, letterSpacing: '0.12em', cursor: deleteInput.toUpperCase() === 'DELETE' ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
                 {deleting ? 'DELETING...' : 'PERMANENTLY DELETE ACCOUNT'}

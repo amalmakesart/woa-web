@@ -49,6 +49,13 @@ function uniqueNormalizedCities(values: Array<string | null | undefined>) {
   return result.sort((a, b) => a.localeCompare(b))
 }
 
+function hasVisibleArtistIdentity(artist: Pick<Artist, 'username' | 'full_name'>) {
+  const username = artist.username?.trim() ?? ''
+  const fullName = artist.full_name?.trim() ?? ''
+
+  return Boolean(username || (fullName && fullName.toUpperCase() !== '[DELETED]'))
+}
+
 // ── Filter Modal (bottom sheet) ───────────────────────────────────────────────
 
 function FilterModal({
@@ -214,7 +221,7 @@ export default function ArtistsPage() {
         discipline: a.discipline ?? null,
         is_available: a.is_available ?? false,
         is_verified: a.is_verified ?? false,
-      })))
+      })).filter(hasVisibleArtistIdentity))
       setAllArtists(mapped as Artist[])
     } catch (e) {
       console.error('Failed to load artists:', e)

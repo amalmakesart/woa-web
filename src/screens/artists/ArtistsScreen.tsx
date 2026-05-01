@@ -73,6 +73,13 @@ function uniqueNormalizedCities(values: Array<string | null | undefined>) {
   return result.sort((a, b) => a.localeCompare(b));
 }
 
+function hasVisibleArtistIdentity(artist: Pick<Artist, 'username' | 'full_name'>) {
+  const username = artist.username?.trim() ?? '';
+  const fullName = artist.full_name?.trim() ?? '';
+
+  return Boolean(username || (fullName && fullName.toUpperCase() !== '[DELETED]'));
+}
+
 // ─── Filter Modal ─────────────────────────────────────────────────────────────
 
 function FilterModal({
@@ -303,12 +310,14 @@ export default function ArtistsScreen() {
         .order('created_at', { ascending: false })
         .limit(200);
       if (fallback) {
-        const mapped = sortByRecent((fallback as any[]).map(a => ({ ...a, art_types: [], discipline: null, is_available: false, is_verified: false })));
+        const mapped = sortByRecent((fallback as any[])
+          .map(a => ({ ...a, art_types: [], discipline: null, is_available: false, is_verified: false }))
+          .filter(hasVisibleArtistIdentity));
         setAllArtists(mapped as Artist[]);
         setDisplayed(mapped as Artist[]);
       }
     } else {
-      const sorted = sortByRecent(data as Artist[]);
+      const sorted = sortByRecent((data as Artist[]).filter(hasVisibleArtistIdentity));
       setAllArtists(sorted);
       setDisplayed(sorted);
     }
