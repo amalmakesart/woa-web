@@ -401,6 +401,10 @@ export default function SignupPage() {
     return base
   }
 
+  function buildAuthMetadata() {
+    return buildProfileData(null)
+  }
+
   async function uploadAvatar(userId: string) {
     if (!avatarFile) return null
     const supabase = createClient()
@@ -419,12 +423,13 @@ export default function SignupPage() {
     setLoading(true)
     const supabase = createClient()
     try {
+      const authMetadata = buildAuthMetadata()
       const profileData = buildProfileData(avatarFallbackUrl)
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: profileData,
+          data: authMetadata,
           emailRedirectTo: EMAIL_REDIRECT_URL,
         },
       })
